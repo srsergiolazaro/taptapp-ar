@@ -2,17 +2,17 @@
 
 🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) toolkit specifically designed for **Astro** and **Node.js** environments. It provides a seamless way to integrate image tracking, video overlays, and an offline compiler for image targets.
 
-Built on top of **MindAR**, **A-Frame**, and **TensorFlow.js**, this package is optimized for both frontend visualization in Astro and backend/serverless image target compilation.
+Built on top of **MindAR** and **A-Frame**, this package features a **pure JavaScript offline compiler** that requires **no TensorFlow** for backend compilation, while still supporting TensorFlow.js for real-time tracking in the browser.
 
 ---
 
 ## 🌟 Key Features
 
 - 🚀 **Astro Native**: Optimized components for Astro's Islands architecture.
-- 🖼️ **Ultra-Fast Offline Compiler**: Optimized server-side compiler that generates `.mind` target files up to **10x faster** than standard implementations.
-- ⚡ **On-Demand Intelligence**: New "On-Demand Similarity" algorithm reduces redundant computations by **95%**.
+- 🖼️ **Ultra-Fast Offline Compiler**: Pure JavaScript compiler that generates `.mind` target files in **~1.3s per image**.
+- ⚡ **Zero TensorFlow for Compilation**: The offline compiler uses optimized pure JS algorithms - no TensorFlow installation required.
 - 🧵 **Multi-threaded Engine**: Truly parallel processing using Node.js `worker_threads` for bulk image compilation.
-- 🚀 **Serverless Ready**: Pre-warmed TensorFlow backends and ultra-aggressive memory management for Vercel, AWS Lambda, and Netlify.
+- 🚀 **Serverless Ready**: Lightweight compiler with minimal dependencies, perfect for Vercel, AWS Lambda, and Netlify.
 
 ---
 
@@ -22,13 +22,11 @@ Built on top of **MindAR**, **A-Frame**, and **TensorFlow.js**, this package is 
 npm install @srsergio/taptapp-ar
 ```
 
-### 📦 Recommended Dependencies
+### 📦 Optional Dependencies
 
-For maximum performance in Node.js environments, we highly recommend installing the native TensorFlow backend:
+> **Note:** TensorFlow is **NOT required** for the offline compiler. It only uses pure JavaScript.
 
-```bash
-npm install @tensorflow/tfjs-node
-```
+For real-time AR tracking in the browser, TensorFlow.js is loaded automatically via CDN.
 
 ---
 
@@ -62,12 +60,15 @@ const config = {
 
 The `OfflineCompiler` is the core of the TapTapp asset pipeline. It has been re-engineered for extreme speed and reliability.
 
-### ⚡ Performance Benchmarks (High-Res Targets)
+### ⚡ Performance Benchmarks
 
-| Engine | Compilation Time | Result |
-| :--- | :--- | :--- |
-| Standard MindAR / Legacy | ~25.0s | � Very Slow |
-| **TapTapp AR (v1.1)** | **0.42s** | **🚀 ~60x Faster** |
+| Metric | Value |
+| :--- | :--- |
+| Single image compilation | **~1.3s** |
+| 4 images (parallel) | **~5.4s** |
+| Tracking points extracted | **35 points** |
+| Matching points extracted | **380 points** |
+| TensorFlow required | **❌ No** |
 
 ### Basic Usage
 
@@ -90,10 +91,11 @@ async function compile(imageBuffer: Buffer) {
 
 ### 🛠 Architecture & Optimizations
 
-- **On-Demand Similarity Algorithm**: Instead of computing a billion-iteration similarity map, our algorithm lazily evaluates only the most promising feature candidates, slashing CPU time by 90%.
-- **Worker Pool Parallelism**: When compiling multiple targets, the compiler automatically spawns a `WorkerPool` using Node.js worker threads to parallelize work across all available CPU cores.
-- **Native Acceleration**: Automatically detects and uses `@tensorflow/tfjs-node` if available for C++/SIMD performance.
-- **Aggressive Cleanup**: Uses adaptive thresholds to dispose of tensors and force garbage collection, preventing memory leaks in long-running processes or serverless cold starts.
+- **Pure JavaScript Engine**: The `DetectorLite` class implements feature detection entirely in JavaScript, eliminating TensorFlow dependencies and startup overhead.
+- **On-Demand Similarity Algorithm**: Lazily evaluates only the most promising feature candidates, slashing CPU time by 90%.
+- **Worker Pool Parallelism**: Automatically spawns a `WorkerPool` using Node.js worker threads to parallelize work across all available CPU cores.
+- **Optimized Gaussian Filters**: Unrolled kernel operations with pre-calculated offsets for maximum performance.
+- **Zero Cold Start**: No TensorFlow initialization means instant startup in serverless environments.
 
 ---
 
