@@ -1,8 +1,7 @@
 import { Controller } from "./controller.js";
 import { Compiler } from "./compiler.js";
-import { UI } from "../ui/ui.js";
 
-export { Controller, Compiler, UI };
+export { Controller, Compiler };
 
 if (!window.MINDAR) {
   window.MINDAR = {};
@@ -11,5 +10,4 @@ if (!window.MINDAR) {
 window.MINDAR.IMAGE = {
   Controller,
   Compiler,
-  UI,
 };

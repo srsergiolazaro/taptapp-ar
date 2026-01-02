@@ -1,23 +1,35 @@
 {
-    "name": "@taptapp/ar",
-    "version": "1.0.0",
+    "name": "@srsergio/taptapp-ar",
+    "version": "1.0.1",
     "description": "AR Visualizer and Compiler for Astro and React",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/srsergiolazaro/taptapp-ar.git"
+    },
+    "bugs": {
+        "url": "https://github.com/srsergiolazaro/taptapp-ar/issues"
+    },
+    "homepage": "https://github.com/srsergiolazaro/taptapp-ar#readme",
     "type": "module",
     "main": "./dist/index.js",
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "exports": {
-        ".": "./dist/index.js",
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
         "./astro/*": "./src/astro/*.astro",
         "./compiler/*": "./src/compiler/*.js"
     },
     "files": [
         "dist",
-        "src"
+        "src",
+        "README.md"
     ],
     "scripts": {
         "build": "tsc",
-        "dev": "tsc --watch"
+        "prepublishOnly": "npm run build"
     },
     "peerDependencies": {
         "astro": ">=4.0.0",
@@ -33,7 +45,8 @@
         "ml-matrix": "^6.10.4",
         "svd-js": "^1.1.1",
         "tinyqueue": "^2.0.3",
-        "canvas": "^3.1.0"
+        "lucide-react": "^0.477.0",
+        "nanoid": "^5.0.7"
     },
     "devDependencies": {
         "typescript": "^5.4.5",
@@ -41,5 +54,8 @@
         "@types/react-dom": "^18.3.0",
         "@types/three": "^0.170.0",
         "astro": "5.16.4"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }

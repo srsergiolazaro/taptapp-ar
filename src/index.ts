@@ -1,6 +1,6 @@
-export * from "./components/AREditor";
-export * from "./components/ProgressDialog";
-export * from "./components/types";
+export * from "./react/AREditor";
+export * from "./react/ProgressDialog";
+export * from "./react/types";
 export * from "./compiler/offline-compiler";
 
 // Re-export specific compiler components if needed
