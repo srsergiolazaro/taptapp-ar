@@ -19,7 +19,9 @@ const buildImageList = (inputImage) => {
   let c = minScale;
   while (true) {
     scaleList.push(c);
-    c *= Math.pow(2.0, 1.0 / 3.0);
+    // Optimization: Paso balanceado (aprox 1.5)
+    // Mejor cobertura que 2.0, pero mucho más ligero que 1.41 o 1.26
+    c *= Math.pow(2.0, 0.6);
     if (c >= 0.95) {
       c = 1;
       break;
@@ -47,7 +49,7 @@ const buildTrackingImageList = (inputImage) => {
   const minDimension = Math.min(inputImage.width, inputImage.height);
   const scaleList = [];
   const imageList = [];
-  scaleList.push(256.0 / minDimension);
+  // Solo generamos la versión de 128px para ahorrar espacio (antes generaba 256px y 128px)
   scaleList.push(128.0 / minDimension);
   for (let i = 0; i < scaleList.length; i++) {
     imageList.push(

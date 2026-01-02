@@ -15,8 +15,8 @@ import { gpuCompute } from "../utils/gpu-compute.js";
 
 const PYRAMID_MIN_SIZE = 8;
 const PYRAMID_MAX_OCTAVE = 5;
-const NUM_BUCKETS_PER_DIMENSION = 10;
-const MAX_FEATURES_PER_BUCKET = 5;
+const NUM_BUCKETS_PER_DIMENSION = 8;
+const MAX_FEATURES_PER_BUCKET = 3; // Optimizado: Reducido de 5 a 3 para menor peso
 const ORIENTATION_NUM_BINS = 36;
 const FREAK_EXPANSION_FACTOR = 7.0;
 
@@ -470,38 +470,25 @@ export class DetectorLite {
                     data[y1 * width + x1] * fracX * fracY;
             }
 
-            // Compute binary descriptor by comparing pairs
-            const descriptors = [];
-            let byteVal = 0;
+            // Pack pairs into Uint8Array (84 bytes per descriptor)
+            const descriptor = new Uint8Array(84);
             let bitCount = 0;
-            let descIdx = 0;
+            let byteIdx = 0;
 
             for (let i = 0; i < FREAKPOINTS.length; i++) {
                 for (let j = i + 1; j < FREAKPOINTS.length; j++) {
                     if (samples[i] < samples[j]) {
-                        byteVal |= (1 << (7 - bitCount));
+                        descriptor[byteIdx] |= (1 << (7 - bitCount));
                     }
                     bitCount++;
 
                     if (bitCount === 8) {
-                        if (descIdx % 4 === 3) {
-                            // Pack 4 bytes into one number
-                            const b0 = descriptors[descriptors.length - 3] || 0;
-                            const b1 = descriptors[descriptors.length - 2] || 0;
-                            const b2 = descriptors[descriptors.length - 1] || 0;
-                            descriptors.length -= 3;
-                            descriptors.push(b0 * 16777216 + b1 * 65536 + b2 * 256 + byteVal);
-                        } else {
-                            descriptors.push(byteVal);
-                        }
-                        byteVal = 0;
+                        byteIdx++;
                         bitCount = 0;
-                        descIdx++;
                     }
                 }
             }
-
-            ext.descriptors = descriptors;
+            ext.descriptors = descriptor;
         }
     }
 }

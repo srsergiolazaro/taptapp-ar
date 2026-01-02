@@ -1,23 +1,19 @@
-// Fast computation on number of bit sets
-// Ref: https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+// Precomputed bit count lookup table for Uint8Array (Much faster than bit manipulation)
+const BIT_COUNT_8 = new Uint8Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = 0, n = i;
+  while (n > 0) { n &= (n - 1); c++; }
+  BIT_COUNT_8[i] = c;
+}
+
 const compute = (options) => {
   const { v1, v2 } = options;
   let d = 0;
-
-  for (let i = 0; i < v1.length; i++) {
-    let x = (v1[i] ^ v2[i]) >>> 0;
-    d += bitCount(x);
+  const len = v1.length;
+  for (let i = 0; i < len; i++) {
+    d += BIT_COUNT_8[v1[i] ^ v2[i]];
   }
   return d;
-};
-
-const bitCount = (v) => {
-  var c = v - ((v >> 1) & 0x55555555);
-  c = ((c >> 2) & 0x33333333) + (c & 0x33333333);
-  c = ((c >> 4) + c) & 0x0f0f0f0f;
-  c = ((c >> 8) + c) & 0x00ff00ff;
-  c = ((c >> 16) + c) & 0x0000ffff;
-  return c;
 };
 
 export { compute };

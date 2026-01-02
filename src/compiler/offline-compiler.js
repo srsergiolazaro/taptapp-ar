@@ -26,7 +26,7 @@ const isNode = typeof process !== "undefined" &&
   process.versions != null &&
   process.versions.node != null;
 
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3; // Protocol v3: High-performance Columnar Binary Format
 
 /**
  * Compilador offline optimizado sin TensorFlow
@@ -231,21 +231,45 @@ export class OfflineCompiler {
   }
 
   /**
-   * Exporta datos compilados en formato msgpack
+   * Exporta datos compilados en formato binario columnar optimizado
    */
   exportData() {
     if (!this.data) {
       throw new Error("No hay datos compilados para exportar");
     }
 
-    const dataList = this.data.map(item => ({
-      targetImage: {
-        width: item.targetImage.width,
-        height: item.targetImage.height,
-      },
-      trackingData: item.trackingData,
-      matchingData: item.matchingData,
-    }));
+    const dataList = this.data.map((item) => {
+      // Optimizamos MatchingData convirtiéndolo a formato columnar
+      const matchingData = item.matchingData.map((kf) => this._packKeyframe(kf));
+
+      // Optimizamos TrackingData (Zero-copy layout)
+      const trackingData = item.trackingData.map((td) => {
+        const count = td.points.length;
+        const px = new Float32Array(count);
+        const py = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+          px[i] = td.points[i].x;
+          py[i] = td.points[i].y;
+        }
+        return {
+          w: td.width,
+          h: td.height,
+          s: td.scale,
+          px,
+          py,
+          d: td.data, // Grayscale pixel data (Uint8Array)
+        };
+      });
+
+      return {
+        targetImage: {
+          width: item.targetImage.width,
+          height: item.targetImage.height,
+        },
+        trackingData,
+        matchingData,
+      };
+    });
 
     return msgpack.encode({
       v: CURRENT_VERSION,
@@ -253,24 +277,104 @@ export class OfflineCompiler {
     });
   }
 
+  _packKeyframe(kf) {
+    return {
+      w: kf.width,
+      h: kf.height,
+      s: kf.scale,
+      max: this._columnarize(kf.maximaPoints, kf.maximaPointsCluster),
+      min: this._columnarize(kf.minimaPoints, kf.minimaPointsCluster),
+    };
+  }
+
+  _columnarize(points, tree) {
+    const count = points.length;
+    const x = new Float32Array(count);
+    const y = new Float32Array(count);
+    const angle = new Float32Array(count);
+    const descriptors = new Uint8Array(count * 84); // 84 bytes per point (FREAK)
+
+    for (let i = 0; i < count; i++) {
+      x[i] = points[i].x;
+      y[i] = points[i].y;
+      angle[i] = points[i].angle;
+      descriptors.set(points[i].descriptors, i * 84);
+    }
+
+    return {
+      x,
+      y,
+      a: angle,
+      d: descriptors,
+      t: this._compactTree(tree.rootNode),
+    };
+  }
+
+  _compactTree(node) {
+    if (node.leaf) {
+      return [1, node.centerPointIndex || 0, node.pointIndexes];
+    }
+    return [0, node.centerPointIndex || 0, node.children.map((c) => this._compactTree(c))];
+  }
+
   /**
-   * Importa datos desde buffer msgpack
+   * Importa datos - Mantiene el formato columnar para máximo rendimiento (Zero-copy)
    */
   importData(buffer) {
     const content = msgpack.decode(new Uint8Array(buffer));
 
     if (!content.v || content.v !== CURRENT_VERSION) {
-      console.error("Your compiled .mind might be outdated. Please recompile");
+      console.error("Incompatible .mind version. Required: " + CURRENT_VERSION);
       return [];
     }
 
-    this.data = content.dataList.map(item => ({
-      targetImage: item.targetImage,
-      trackingData: item.trackingData,
-      matchingData: item.matchingData,
-    }));
+    // Ya no de-columnarizamos aquí. Los motores (Tracker/Matcher)
+    // ahora están optimizados para leer directamente de los buffers.
+    this.data = content.dataList;
 
     return this.data;
+  }
+
+  _unpackKeyframe(kf) {
+    return {
+      width: kf.w,
+      height: kf.h,
+      scale: kf.s,
+      maximaPoints: this._decolumnarize(kf.max),
+      minimaPoints: this._decolumnarize(kf.min),
+      maximaPointsCluster: { rootNode: this._expandTree(kf.max.t) },
+      minimaPointsCluster: { rootNode: this._expandTree(kf.min.t) },
+    };
+  }
+
+  _decolumnarize(col) {
+    const points = [];
+    const count = col.x.length;
+    for (let i = 0; i < count; i++) {
+      points.push({
+        x: col.x[i],
+        y: col.y[i],
+        angle: col.a[i],
+        descriptors: col.d.slice(i * 84, (i + 1) * 84),
+      });
+    }
+    return points;
+  }
+
+  _expandTree(node) {
+    const isLeaf = node[0] === 1;
+    if (isLeaf) {
+      return {
+        leaf: true,
+        centerPointIndex: node[1],
+        pointIndexes: node[2],
+      };
+    }
+    return {
+      leaf: false,
+      centerPointIndex: node[1],
+      children: node[2].map((c) => this._expandTree(c)),
+    };
   }
 
   /**

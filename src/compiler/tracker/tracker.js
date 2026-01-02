@@ -7,7 +7,7 @@ const AR2_SEARCH_SIZE = 10;
 const AR2_SEARCH_GAP = 1;
 const AR2_SIM_THRESH = 0.8;
 
-const TRACKING_KEYFRAME = 1; // 0: 256px, 1: 128px
+const TRACKING_KEYFRAME = 0; // 0: 128px (optimized)
 
 // For some mobile device, only 16bit floating point texture is supported
 //   ref: https://www.tensorflow.org/js/guide/platform_environment#precision
@@ -35,7 +35,7 @@ class Tracker {
     // prebuild feature and marker pixel tensors
     let maxCount = 0;
     for (let i = 0; i < this.trackingKeyframeList.length; i++) {
-      maxCount = Math.max(maxCount, this.trackingKeyframeList[i].points.length);
+      maxCount = Math.max(maxCount, this.trackingKeyframeList[i].px.length);
     }
     this.featurePointsListT = [];
     this.imagePixelsListT = [];
@@ -102,8 +102,10 @@ class Tracker {
     const screenCoords = [];
     const goodTrack = [];
 
+    const { px, py, s: scale } = trackingFrame;
+
     for (let i = 0; i < matchingPoints.length; i++) {
-      if (sim[i] > AR2_SIM_THRESH && i < trackingFrame.points.length) {
+      if (sim[i] > AR2_SIM_THRESH && i < px.length) {
         goodTrack.push(i);
         const point = computeScreenCoordiate(
           modelViewProjectionTransform,
@@ -112,8 +114,8 @@ class Tracker {
         );
         screenCoords.push(point);
         worldCoords.push({
-          x: trackingFrame.points[i].x / trackingFrame.scale,
-          y: trackingFrame.points[i].y / trackingFrame.scale,
+          x: px[i] / scale,
+          y: py[i] / scale,
           z: 0,
         });
       }
@@ -355,23 +357,18 @@ class Tracker {
 
   _prebuild(trackingFrame, maxCount) {
     return tf.tidy(() => {
-      const scale = trackingFrame.scale;
+      const { px, py, s: scale, d: data, w: width, h: height } = trackingFrame;
 
       const p = [];
       for (let k = 0; k < maxCount; k++) {
-        if (k < trackingFrame.points.length) {
-          p.push([trackingFrame.points[k].x / scale, trackingFrame.points[k].y / scale]);
+        if (k < px.length) {
+          p.push([px[k] / scale, py[k] / scale]);
         } else {
           p.push([-1, -1]);
         }
       }
-      const imagePixels = tf.tensor(trackingFrame.data, [
-        trackingFrame.width * trackingFrame.height,
-      ]);
-      const imageProperties = tf.tensor(
-        [trackingFrame.width, trackingFrame.height, trackingFrame.scale],
-        [3],
-      );
+      const imagePixels = tf.tensor(data, [width * height]);
+      const imageProperties = tf.tensor([width, height, scale], [3]);
       const featurePoints = tf.tensor(p, [p.length, 2], "float32");
 
       return {
