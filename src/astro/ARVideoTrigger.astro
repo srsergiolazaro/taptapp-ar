@@ -1,0 +1,73 @@
+---
+import ARStyles from "./styles/ARStyles.astro";
+import LoadingOverlay from "./overlays/LoadingOverlay.astro";
+import ScanningOverlay from "./overlays/ScanningOverlay.astro";
+import ErrorOverlay from "./overlays/ErrorOverlay.astro";
+import ARScene from "./ARScene.astro";
+import ARScripts from "./scripts/ARScripts.astro";
+import type { PropsConfig } from "../react/types";
+interface Props {
+  config: PropsConfig;
+}
+
+const {config} = Astro.props ;
+---
+
+<!doctype html>
+<html lang="es-PE">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://go.taptapp.xyz" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+    <meta name="theme-color" content="#3367D6" />
+    <meta
+      name="description"
+      content="Crea impacto duradero y genera confianza en tus clientes con la tarjeta digital TapTapp. Presenta tu información de manera clara y atractiva para conectar con el futuro."
+    />
+    <meta name="keywords" content="tarjeta digital, identidad, futuro, confianza, clientes" />
+    <meta name="author" content="@srsergiolazaro" />
+
+    <meta property="og:title" content="TapTapp AR Experience" />
+    <meta
+      property="og:description"
+      content="Descubre nuestra experiencia de realidad aumentada y da vida a tu tarjeta digital TapTapp."
+    />
+    <meta property="og:image" content="https://go.taptapp.xyz/Imgsocial.jpg" />
+    <meta property="og:url" content="https://go.taptapp.xyz" />
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="anonymous" />
+
+    <title>TapTapp AR Experience</title>
+    <script is:inline src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script is:inline src="https://r2-worker.sergiolazaromondargo.workers.dev/taptapp-ar.prod.js"
+    ></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <ARStyles />
+    <ARScripts />
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        margin: 0;
+        overflow: hidden;
+      }
+      @view-transition {
+        navigation: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Custom UI Overlays -->
+    <LoadingOverlay />
+    <ScanningOverlay targetImage={config.targetImageSrc} />
+    <ErrorOverlay />
+
+    <ARScene config={config} />
+  </body>
+</html>
