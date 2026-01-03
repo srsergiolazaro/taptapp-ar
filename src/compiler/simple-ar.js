@@ -155,48 +155,68 @@ class SimpleAR {
 
         const [markerW, markerH] = this.markerDimensions[targetIndex];
         const containerRect = this.container.getBoundingClientRect();
-        const videoW = this.video.videoWidth;
-        const videoH = this.video.videoHeight;
+
+        // Video source dimensions (e.g., 1280x720)
+        let videoW = this.video.videoWidth;
+        let videoH = this.video.videoHeight;
+
+        // Detect if the video is effectively rotated (Portrait on Mobile)
+        // Browser displays video vertically but videoWidth > videoHeight
+        const isPortrait = containerRect.height > containerRect.width;
+        const isVideoLandscape = videoW > videoH;
+        const needsRotation = isPortrait && isVideoLandscape;
+
+        // If rotated, the effective buffer dimensions are swapped
+        const effectiveBufferW = needsRotation ? videoH : videoW;
+        const effectiveBufferH = needsRotation ? videoW : videoH;
 
         // Calculate display area considering object-fit: cover
         const containerAspect = containerRect.width / containerRect.height;
-        const videoAspect = videoW / videoH;
+        const bufferAspect = effectiveBufferW / effectiveBufferH;
 
         let displayW, displayH, offsetX, offsetY;
 
-        if (containerAspect > videoAspect) {
+        if (containerAspect > bufferAspect) {
             displayW = containerRect.width;
-            displayH = containerRect.width / videoAspect;
+            displayH = containerRect.width / bufferAspect;
             offsetX = 0;
             offsetY = (containerRect.height - displayH) / 2;
         } else {
             displayH = containerRect.height;
-            displayW = containerRect.height * videoAspect;
+            displayW = containerRect.height * bufferAspect;
             offsetX = (containerRect.width - displayW) / 2;
             offsetY = 0;
         }
 
-        const scaleX = displayW / videoW;
-        const scaleY = displayH / videoH;
+        const scaleX = displayW / effectiveBufferW;
+        const scaleY = displayH / effectiveBufferH;
 
-        // Project the center of the marker (markerW/2, markerH/2, 0) into camera space
+        // Project marker center into camera space
         const tx = mVT[0][0] * (markerW / 2) + mVT[0][1] * (markerH / 2) + mVT[0][3];
         const ty = mVT[1][0] * (markerW / 2) + mVT[1][1] * (markerH / 2) + mVT[1][3];
         const tz = mVT[2][0] * (markerW / 2) + mVT[2][1] * (markerH / 2) + mVT[2][3];
 
         // focal length (roughly 45 degrees FOV match Controller.js)
-        const f = videoH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
+        const f = effectiveBufferH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
 
-        // Perspective projection to screen space
-        // Using + for both since t is relative to principal point and Y is down in screen coords.
-        const screenX = offsetX + (videoW / 2 + (tx * f / tz)) * scaleX;
-        const screenY = offsetY + (videoH / 2 + (ty * f / tz)) * scaleY;
+        // Normalized Device Coordinates (NDC) to Screen space
+        let screenX, screenY;
 
-        // Rotation calculation: atan2(y, x) of world X-axis in camera space
-        const rotation = Math.atan2(mVT[1][0], mVT[0][0]);
+        if (needsRotation) {
+            // Map camera X/Y to rotated screen Y/X
+            // Camera X -> Screen Y, Camera Y -> Screen -X
+            screenX = offsetX + (effectiveBufferW / 2 + (ty * f / tz)) * scaleX;
+            screenY = offsetY + (effectiveBufferH / 2 - (tx * f / tz)) * scaleY;
+        } else {
+            screenX = offsetX + (effectiveBufferW / 2 + (tx * f / tz)) * scaleX;
+            screenY = offsetY + (effectiveBufferH / 2 + (ty * f / tz)) * scaleY;
+        }
+
+        // Rotation: compensate for buffer rotation
+        let rotation = Math.atan2(mVT[1][0], mVT[0][0]);
+        if (needsRotation) rotation -= Math.PI / 2;
+
         const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
-
-        // Perspective scale: 1 world pixel = (f/tz) screen pixels
         const perspectiveScale = (f / tz) * scaleX;
 
         // Detect overlay intrinsic size
@@ -204,14 +224,13 @@ class SimpleAR {
             ? this.overlay.videoWidth
             : (this.overlay instanceof HTMLImageElement ? this.overlay.naturalWidth : 0);
 
-        // Final scale = (Target Width in Pixels on screen) / (Overlay Intrinsic Width) * scaleMultiplier
         const baseScale = intrinsicWidth > 0
             ? (matrixScale * markerW * perspectiveScale) / intrinsicWidth
             : 1.0;
 
         const finalScale = baseScale * this.scaleMultiplier;
 
-        // Ensure element doesn't have CSS width that interferes with scaling
+        // Apply transform
         this.overlay.style.width = 'auto';
         this.overlay.style.height = 'auto';
         this.overlay.style.position = 'absolute';
