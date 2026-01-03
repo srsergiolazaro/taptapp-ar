@@ -188,8 +188,8 @@ class SimpleAR {
         const scaleX = displayW / effectiveBufferW;
         const scaleY = displayH / effectiveBufferH;
 
-        // 3. Focal Length (MUST match Controller.js projection)
-        // Controller.js uses inputHeight / 2 as the vertical reference.
+        // 3. Focal Length (MUST match Controller.js)
+        // Controller uses inputHeight / 2 (sensor's vertical dimension) as the baseline.
         const f = videoH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
 
         // 4. Project marker center into camera space
@@ -214,25 +214,22 @@ class SimpleAR {
         //atan2 gives angle of world X-axis in camera space.
         let rotation = Math.atan2(mVT[1][0], mVT[0][0]);
         if (needsRotation) {
-            rotation += Math.PI / 2; // Compensate for the 90deg rotation of the video element
+            rotation -= Math.PI / 2; // Mapping Sensor frame to Portrait Screen frame
         }
 
-        // 7. Scale calculation
+        // 7. Scale calculation (Robust Method)
+        // Instead of detecting intrinsic width (unstable), we force a base CSS width 
+        // and calculate the scale to match the marker's projected screen width.
+        const BASE_CSS_WIDTH = 1000;
         const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
         const perspectiveScale = (f / tz) * scaleX;
 
-        const intrinsicWidth = (this.overlay instanceof HTMLVideoElement)
-            ? this.overlay.videoWidth
-            : (this.overlay instanceof HTMLImageElement ? this.overlay.naturalWidth : 0);
+        // Target pixel width on screen = markerW * matrixScale * perspectiveScale
+        const targetScreenWidth = markerW * matrixScale * perspectiveScale;
+        const finalScale = (targetScreenWidth / BASE_CSS_WIDTH) * this.scaleMultiplier;
 
-        const baseScale = intrinsicWidth > 0
-            ? (matrixScale * markerW * perspectiveScale) / intrinsicWidth
-            : 1.0;
-
-        const finalScale = baseScale * this.scaleMultiplier;
-
-        // Apply transform
-        this.overlay.style.width = 'auto';
+        // Apply
+        this.overlay.style.width = `${BASE_CSS_WIDTH}px`;
         this.overlay.style.height = 'auto';
         this.overlay.style.position = 'absolute';
         this.overlay.style.transformOrigin = 'center center';
