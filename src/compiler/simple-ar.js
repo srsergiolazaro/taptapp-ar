@@ -156,26 +156,23 @@ class SimpleAR {
         const [markerW, markerH] = this.markerDimensions[targetIndex];
         const containerRect = this.container.getBoundingClientRect();
 
-        // Video source dimensions (e.g., 1280x720)
-        let videoW = this.video.videoWidth;
-        let videoH = this.video.videoHeight;
+        // 1. Raw Video Dimensions (Sensor Frame)
+        const videoW = this.video.videoWidth;
+        const videoH = this.video.videoHeight;
 
-        // Detect if the video is effectively rotated (Portrait on Mobile)
-        // Browser displays video vertically but videoWidth > videoHeight
+        // 2. Detect if screen orientation is different from video buffer
         const isPortrait = containerRect.height > containerRect.width;
         const isVideoLandscape = videoW > videoH;
         const needsRotation = isPortrait && isVideoLandscape;
 
-        // If rotated, the effective buffer dimensions are swapped
+        // Effective dimensions of the display buffer
         const effectiveBufferW = needsRotation ? videoH : videoW;
         const effectiveBufferH = needsRotation ? videoW : videoH;
 
-        // Calculate display area considering object-fit: cover
         const containerAspect = containerRect.width / containerRect.height;
         const bufferAspect = effectiveBufferW / effectiveBufferH;
 
         let displayW, displayH, offsetX, offsetY;
-
         if (containerAspect > bufferAspect) {
             displayW = containerRect.width;
             displayH = containerRect.width / bufferAspect;
@@ -191,20 +188,21 @@ class SimpleAR {
         const scaleX = displayW / effectiveBufferW;
         const scaleY = displayH / effectiveBufferH;
 
-        // Project marker center into camera space
+        // 3. Focal Length (MUST match Controller.js projection)
+        // Controller.js uses inputHeight / 2 as the vertical reference.
+        const f = videoH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
+
+        // 4. Project marker center into camera space
         const tx = mVT[0][0] * (markerW / 2) + mVT[0][1] * (markerH / 2) + mVT[0][3];
         const ty = mVT[1][0] * (markerW / 2) + mVT[1][1] * (markerH / 2) + mVT[1][3];
         const tz = mVT[2][0] * (markerW / 2) + mVT[2][1] * (markerH / 2) + mVT[2][3];
 
-        // focal length (roughly 45 degrees FOV match Controller.js)
-        const f = effectiveBufferH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
-
-        // Normalized Device Coordinates (NDC) to Screen space
+        // 5. Map Camera coordinates to Screen coordinates
         let screenX, screenY;
-
         if (needsRotation) {
-            // Map camera X/Y to rotated screen Y/X
-            // Camera X -> Screen Y, Camera Y -> Screen -X
+            // Mapping Sensor coordinates to Rotated Screen coordinates
+            // Sensor +X -> Screen +Y
+            // Sensor +Y -> Screen -X (relative to logical center)
             screenX = offsetX + (effectiveBufferW / 2 + (ty * f / tz)) * scaleX;
             screenY = offsetY + (effectiveBufferH / 2 - (tx * f / tz)) * scaleY;
         } else {
@@ -212,14 +210,17 @@ class SimpleAR {
             screenY = offsetY + (effectiveBufferH / 2 + (ty * f / tz)) * scaleY;
         }
 
-        // Rotation: compensate for buffer rotation
+        // 6. Rotation: sync with CSS transform
+        //atan2 gives angle of world X-axis in camera space.
         let rotation = Math.atan2(mVT[1][0], mVT[0][0]);
-        if (needsRotation) rotation -= Math.PI / 2;
+        if (needsRotation) {
+            rotation += Math.PI / 2; // Compensate for the 90deg rotation of the video element
+        }
 
+        // 7. Scale calculation
         const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
         const perspectiveScale = (f / tz) * scaleX;
 
-        // Detect overlay intrinsic size
         const intrinsicWidth = (this.overlay instanceof HTMLVideoElement)
             ? this.overlay.videoWidth
             : (this.overlay instanceof HTMLImageElement ? this.overlay.naturalWidth : 0);
