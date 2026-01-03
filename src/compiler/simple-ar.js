@@ -167,70 +167,49 @@ class SimpleAR {
 
         const [markerW, markerH] = this.markerDimensions[targetIndex];
         const containerRect = this.container.getBoundingClientRect();
-
         const videoW = this.video.videoWidth;
         const videoH = this.video.videoHeight;
 
+        // 1. Determine orientation needs
         const isPortrait = containerRect.height > containerRect.width;
         const isVideoLandscape = videoW > videoH;
         const needsRotation = isPortrait && isVideoLandscape;
 
-        // Current display dimensions of the video (accounting for rotation)
-        const vW = needsRotation ? videoH : videoW;
-        const vH = needsRotation ? videoW : videoH;
+        // 2. Get intrinsic projection from controller
+        const proj = this.controller.projectionTransform;
 
-        // Robust "object-fit: cover" scale calculation
-        const perspectiveScale = Math.max(containerRect.width / vW, containerRect.height / vH);
+        // 3. Project 3 points to determine position, scale, and rotation
+        // Points in Marker Space: Center, Right-Edge, and Down-Edge
+        const pMid = this._projectToScreen(markerW / 2, markerH / 2, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
+        const pRight = this._projectToScreen(markerW / 2 + 100, markerH / 2, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
 
-        const displayW = vW * perspectiveScale;
-        const displayH = vH * perspectiveScale;
-        const offsetX = (containerRect.width - displayW) / 2;
-        const offsetY = (containerRect.height - displayH) / 2;
+        // 4. Calculate Screen Position
+        const screenX = pMid.sx;
+        const screenY = pMid.sy;
 
-        // The tracker uses focal length based on height dimension in tracker space
-        const f = (videoH / 2) / Math.tan((45.0 * Math.PI / 180) / 2);
+        // 5. Calculate Rotation and Scale from the projected X-axis vector
+        const dx = pRight.sx - pMid.sx;
+        const dy = pRight.sy - pMid.sy;
 
-        // Center of the marker in camera space (marker coordinates origin at top-left)
-        const tx = mVT[0][0] * (markerW / 2) + mVT[0][1] * (markerH / 2) + mVT[0][3];
-        const ty = mVT[1][0] * (markerW / 2) + mVT[1][1] * (markerH / 2) + mVT[1][3];
-        const tz = mVT[2][0] * (markerW / 2) + mVT[2][1] * (markerH / 2) + mVT[2][3];
+        const rotation = Math.atan2(dy, dx);
+        const pixelDistance100 = Math.sqrt(dx * dx + dy * dy);
 
-        let screenX, screenY, rotation;
-
-        if (needsRotation) {
-            const bufferOffsetX = (tx * f / tz);
-            const bufferOffsetY = (ty * f / tz);
-
-            screenX = offsetX + (displayW / 2) - (bufferOffsetY * perspectiveScale);
-            screenY = offsetY + (displayH / 2) + (bufferOffsetX * perspectiveScale);
-            rotation = Math.atan2(mVT[1][0], mVT[0][0]) - Math.PI / 2;
-        } else {
-            const bufferOffsetX = (tx * f / tz);
-            const bufferOffsetY = (ty * f / tz);
-
-            screenX = offsetX + (displayW / 2) + (bufferOffsetX * perspectiveScale);
-            screenY = offsetY + (displayH / 2) + (bufferOffsetY * perspectiveScale);
-            rotation = Math.atan2(mVT[1][0], mVT[0][0]);
-        }
-
-        const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
-        const finalScale = (f / tz) * perspectiveScale * matrixScale * this.scaleMultiplier;
+        // Since we projected 100 units, the scale for the whole markerW is:
+        const finalScale = (pixelDistance100 / 100) * this.scaleMultiplier;
 
         // DEBUG LOGS
         if (window.AR_DEBUG) {
-            console.log('--- AR POSITION DEBUG ---');
-            console.log('Container:', containerRect.width, 'x', containerRect.height);
+            console.log('--- AR POSITION DEBUG (Point Projection) ---');
+            console.log('Container:', containerRect.width.toFixed(0), 'x', containerRect.height.toFixed(0));
             console.log('Video:', videoW, 'x', videoH, 'needsRotation:', needsRotation);
-            console.log('PerspectiveScale (Cover):', perspectiveScale);
-            console.log('Display:', displayW, 'x', displayH, 'Offsets:', offsetX, offsetY);
-            console.log('Projection (tx, ty, tz):', tx.toFixed(2), ty.toFixed(2), tz.toFixed(2));
-            console.log('Screen Coords:', screenX.toFixed(2), screenY.toFixed(2));
-            console.log('Final Scale:', finalScale.toFixed(4), '(MatrixScale:', matrixScale.toFixed(4), ')');
+            console.log('Screen Pos:', screenX.toFixed(1), screenY.toFixed(1));
+            console.log('Rotated Angle:', (rotation * 180 / Math.PI).toFixed(1), 'deg');
+            console.log('Final Scale:', finalScale.toFixed(4));
         }
 
         // Apply
         this.overlay.style.width = `${markerW}px`;
-        this.overlay.style.height = 'auto';
+        this.overlay.style.height = 'auto'; // Maintain aspect ratio of the overlay asset
         this.overlay.style.position = 'absolute';
         this.overlay.style.transformOrigin = 'center center';
         this.overlay.style.left = '0';
@@ -238,9 +217,45 @@ class SimpleAR {
         this.overlay.style.transform = `
             translate(${screenX}px, ${screenY}px)
             translate(-50%, -50%)
-            scale(${finalScale})
             rotate(${rotation}rad)
+            scale(${finalScale})
         `;
+    }
+
+    /**
+     * Projects a 3D marker-space point all the way to 2D screen CSS pixels
+     */
+    _projectToScreen(x, y, z, mVT, proj, videoW, videoH, containerRect, needsRotation) {
+        // Marker -> Camera Space
+        const tx = mVT[0][0] * x + mVT[0][1] * y + mVT[0][2] * z + mVT[0][3];
+        const ty = mVT[1][0] * x + mVT[1][1] * y + mVT[1][2] * z + mVT[1][3];
+        const tz = mVT[2][0] * x + mVT[2][1] * y + mVT[2][2] * z + mVT[2][3];
+
+        // Camera -> Buffer Pixels (e.g. 1280x720)
+        const bx = (proj[0][0] * tx / tz) + proj[0][2];
+        const by = (proj[1][1] * ty / tz) + proj[1][2];
+
+        // Buffer -> Screen CSS Pixels
+        const vW = needsRotation ? videoH : videoW;
+        const vH = needsRotation ? videoW : videoH;
+        const perspectiveScale = Math.max(containerRect.width / vW, containerRect.height / vH);
+
+        const displayW = vW * perspectiveScale;
+        const displayH = vH * perspectiveScale;
+        const offsetX = (containerRect.width - displayW) / 2;
+        const offsetY = (containerRect.height - displayH) / 2;
+
+        let sx, sy;
+        if (needsRotation) {
+            // Mapping: Camera +X (Right) -> Screen +Y (Down), Camera +Y (Down) -> Screen -X (Left)
+            sx = offsetX + (displayW / 2) - (by - proj[1][2]) * perspectiveScale;
+            sy = offsetY + (displayH / 2) + (bx - proj[0][2]) * perspectiveScale;
+        } else {
+            sx = offsetX + (displayW / 2) + (bx - proj[0][2]) * perspectiveScale;
+            sy = offsetY + (displayH / 2) + (by - proj[1][2]) * perspectiveScale;
+        }
+
+        return { sx, sy };
     }
 }
 
