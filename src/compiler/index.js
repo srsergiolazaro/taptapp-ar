@@ -1,13 +1,11 @@
-import { Controller } from "./controller.js";
-import { Compiler } from "./compiler.js";
+import { OfflineCompiler } from "./offline-compiler.js";
 
-export { Controller, Compiler };
+export { OfflineCompiler };
 
 if (!window.MINDAR) {
   window.MINDAR = {};
 }
 
 window.MINDAR.IMAGE = {
-  Controller,
-  Compiler,
+  OfflineCompiler,
 };
