@@ -179,12 +179,16 @@ class SimpleAR {
         // Matrix is column-major: [m0,m1,m2,m3, m4,m5,m6,m7, m8,m9,m10,m11, m12,m13,m14,m15]
         const tx = worldMatrix[12];
         const ty = worldMatrix[13];
-        const scale = Math.sqrt(worldMatrix[0] ** 2 + worldMatrix[1] ** 2);
+        const matrixScale = Math.sqrt(worldMatrix[0] ** 2 + worldMatrix[1] ** 2);
         const rotation = Math.atan2(worldMatrix[1], worldMatrix[0]);
 
         // Convert from normalized coords to screen coords
         const screenX = offsetX + (videoW / 2 + tx) * scaleX;
         const screenY = offsetY + (videoH / 2 - ty) * scaleY;
+
+        // Scale factor: use a reasonable multiplier (0.5 instead of 0.01)
+        // The matrixScale from the tracking is in image-space coordinates
+        const finalScale = matrixScale * scaleX * 0.5;
 
         // Apply transform
         this.overlay.style.position = 'absolute';
@@ -194,7 +198,7 @@ class SimpleAR {
         this.overlay.style.transform = `
       translate(${screenX}px, ${screenY}px)
       translate(-50%, -50%)
-      scale(${scale * scaleX * 0.01})
+      scale(${finalScale})
       rotate(${-rotation}rad)
     `;
     }

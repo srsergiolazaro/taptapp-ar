@@ -33,19 +33,25 @@ class CropDetector {
   detectMoving(input) {
     const imageData = input;
 
-    // loop a few locations around center
-    const dx = this.lastRandomIndex % 3;
-    const dy = Math.floor(this.lastRandomIndex / 3);
+    // Expanded to 5x5 grid (25 positions) for better coverage
+    const gridSize = 5;
+    const dx = this.lastRandomIndex % gridSize;
+    const dy = Math.floor(this.lastRandomIndex / gridSize);
 
-    let startY = Math.floor(this.height / 2 - this.cropSize + (dy * this.cropSize) / 2);
-    let startX = Math.floor(this.width / 2 - this.cropSize + (dx * this.cropSize) / 2);
+    // Calculate offset from center, with overlap for better detection
+    const stepX = this.cropSize / 3;
+    const stepY = this.cropSize / 3;
 
+    let startY = Math.floor(this.height / 2 - this.cropSize / 2 + (dy - 2) * stepY);
+    let startX = Math.floor(this.width / 2 - this.cropSize / 2 + (dx - 2) * stepX);
+
+    // Clamp to valid bounds
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
     if (startX >= this.width - this.cropSize) startX = this.width - this.cropSize - 1;
     if (startY >= this.height - this.cropSize) startY = this.height - this.cropSize - 1;
 
-    this.lastRandomIndex = (this.lastRandomIndex + 1) % 9;
+    this.lastRandomIndex = (this.lastRandomIndex + 1) % (gridSize * gridSize);
 
     const result = this._detect(imageData, startX, startY);
     return result;
