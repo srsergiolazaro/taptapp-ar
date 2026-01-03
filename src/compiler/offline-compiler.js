@@ -113,79 +113,45 @@ export class OfflineCompiler {
 
       targetImages.push({
         data: greyImageData,
-        height: img.height,
         width: img.width,
+        height: img.height,
       });
     }
 
-    // Fase 1: Matching (50%)
-    console.time("⏱️ Fase Matching");
-    const matchingDataList = await this._compileMatch(targetImages, (percent) => {
-      progressCallback(percent * 0.5);
+    // Compilar Match y Track por separado
+    const matchingDataList = await this._compileMatch(targetImages, (p) => {
+      progressCallback(p * 0.7); // 70% Match
     });
-    console.timeEnd("⏱️ Fase Matching");
 
-    // Fase 2: Tracking (50%)
-    console.time("⏱️ Fase Tracking");
-    const trackingDataList = await this._compileTrack(targetImages, (percent) => {
-      progressCallback(50 + percent * 0.5);
+    const trackingDataList = await this._compileTrack(targetImages, (p) => {
+      progressCallback(70 + p * 0.3); // 30% Track
     });
-    console.timeEnd("⏱️ Fase Tracking");
 
-    // Compilar resultado
-    this.data = targetImages.map((targetImage, i) => ({
-      targetImage: { width: targetImage.width, height: targetImage.height },
-      trackingData: trackingDataList[i],
+    this.data = targetImages.map((img, i) => ({
+      targetImage: img,
       matchingData: matchingDataList[i],
+      trackingData: trackingDataList[i],
     }));
 
     console.timeEnd("⏱️ Compilación total");
-
     return this.data;
   }
 
-  /**
-   * Compila datos de matching usando DetectorLite (JS puro)
-   */
   async _compileMatch(targetImages, progressCallback) {
     const percentPerImage = 100 / targetImages.length;
     let currentPercent = 0;
 
     // Use workers if available
     if (this.workerPool) {
-      const promises = targetImages.map((targetImage, index) => {
-        return this.workerPool.runTask({
-          type: 'match',
-          targetImage,
-          percentPerImage,
-          basePercent: index * percentPerImage,
-          onProgress: (percent) => {
-            // Basic aggregation: this assumes naive progress updates.
-            // Ideally we should track exact progress per image.
-            // For now, simpler to just let the main thread loop handle overall progress callback?
-            // No, workers are async. We need to aggregate.
-            // Actually, the main loop below is serial.
-            // If we use workers, we run them in parallel.
-          }
-        });
-      });
-
-      // Progress handling for parallel workers is tricky without a shared state manager.
-      // Simplified approach: each worker reports its absolute progress contribution?
-      // No, worker reports 'percent' which is base + local.
-      // We can use a shared loadedPercent variable.
-
-      let totalPercent = 0;
       const progressMap = new Float32Array(targetImages.length);
 
       const wrappedPromises = targetImages.map((targetImage, index) => {
         return this.workerPool.runTask({
           type: 'match',
           targetImage,
-          percentPerImage, // Not really needed for logic but worker expects it
-          basePercent: 0, // Worker will report 0-percentPerImage roughly
+          percentPerImage,
+          basePercent: 0,
           onProgress: (p) => {
-            // This 'p' from worker is "base + local". If we passed base=0, it's just local (0 to percentPerImage)
             progressMap[index] = p;
             const sum = progressMap.reduce((a, b) => a + b, 0);
             progressCallback(sum);
@@ -234,9 +200,6 @@ export class OfflineCompiler {
     return results;
   }
 
-  /**
-   * Compila datos de tracking usando extractTrackingFeatures (JS puro)
-   */
   async _compileTrack(targetImages, progressCallback) {
     const percentPerImage = 100 / targetImages.length;
     let currentPercent = 0;
@@ -277,42 +240,26 @@ export class OfflineCompiler {
     return results;
   }
 
-  /**
-   * Método público para compilar tracking (compatibilidad con API anterior)
-   * @param {Object} options - Opciones de compilación
-   * @param {Function} options.progressCallback - Callback de progreso
-   * @param {Array} options.targetImages - Lista de imágenes objetivo
-   * @param {number} options.basePercent - Porcentaje base
-   * @returns {Promise<Array>} Datos de tracking
-   */
   async compileTrack({ progressCallback, targetImages, basePercent = 0 }) {
     return this._compileTrack(targetImages, (percent) => {
       progressCallback(basePercent + percent * (100 - basePercent) / 100);
     });
   }
 
-  /**
-   * Método público para compilar matching (compatibilidad con API anterior)
-   */
   async compileMatch({ progressCallback, targetImages, basePercent = 0 }) {
     return this._compileMatch(targetImages, (percent) => {
       progressCallback(basePercent + percent * (50 - basePercent) / 100);
     });
   }
 
-  /**
-   * Exporta datos compilados en formato binario columnar optimizado
-   */
   exportData() {
     if (!this.data) {
       throw new Error("No hay datos compilados para exportar");
     }
 
     const dataList = this.data.map((item) => {
-      // Optimizamos MatchingData convirtiéndolo a formato columnar
       const matchingData = item.matchingData.map((kf) => this._packKeyframe(kf));
 
-      // Optimizamos TrackingData (Zero-copy layout)
       const trackingData = item.trackingData.map((td) => {
         const count = td.points.length;
         const px = new Float32Array(count);
@@ -344,8 +291,7 @@ export class OfflineCompiler {
     return msgpack.encode({
       v: CURRENT_VERSION,
       dataList,
-      // eslint-disable-next-line
-    }); // eslint-disable-line
+    });
   }
 
   _packKeyframe(kf) {
@@ -363,12 +309,14 @@ export class OfflineCompiler {
     const x = new Float32Array(count);
     const y = new Float32Array(count);
     const angle = new Float32Array(count);
+    const scale = new Float32Array(count);
     const descriptors = new Uint8Array(count * 84); // 84 bytes per point (FREAK)
 
     for (let i = 0; i < count; i++) {
       x[i] = points[i].x;
       y[i] = points[i].y;
       angle[i] = points[i].angle;
+      scale[i] = points[i].scale;
       descriptors.set(points[i].descriptors, i * 84);
     }
 
@@ -376,6 +324,7 @@ export class OfflineCompiler {
       x,
       y,
       a: angle,
+      s: scale,
       d: descriptors,
       t: this._compactTree(tree.rootNode),
     };
@@ -388,9 +337,6 @@ export class OfflineCompiler {
     return [0, node.centerPointIndex || 0, node.children.map((c) => this._compactTree(c))];
   }
 
-  /**
-   * Importa datos - Mantiene el formato columnar para máximo rendimiento (Zero-copy)
-   */
   importData(buffer) {
     const content = msgpack.decode(new Uint8Array(buffer));
 
@@ -399,10 +345,29 @@ export class OfflineCompiler {
       return [];
     }
 
-    // Ya no de-columnarizamos aquí. Los motores (Tracker/Matcher)
-    // ahora están optimizados para leer directamente de los buffers.
-    this.data = content.dataList;
+    // Restore Float32Arrays from Uint8Arrays returned by msgpack
+    const dataList = content.dataList;
+    for (let i = 0; i < dataList.length; i++) {
+      const item = dataList[i];
+      for (const kf of item.matchingData) {
+        for (const col of [kf.max, kf.min]) {
+          if (col.x instanceof Uint8Array) {
+            col.x = new Float32Array(col.x.buffer.slice(col.x.byteOffset, col.x.byteOffset + col.x.byteLength));
+          }
+          if (col.y instanceof Uint8Array) {
+            col.y = new Float32Array(col.y.buffer.slice(col.y.byteOffset, col.y.byteOffset + col.y.byteLength));
+          }
+          if (col.a instanceof Uint8Array) {
+            col.a = new Float32Array(col.a.buffer.slice(col.a.byteOffset, col.a.byteOffset + col.a.byteLength));
+          }
+          if (col.s instanceof Uint8Array) {
+            col.s = new Float32Array(col.s.buffer.slice(col.s.byteOffset, col.s.byteOffset + col.s.byteLength));
+          }
+        }
+      }
+    }
 
+    this.data = dataList;
     return this.data;
   }
 
@@ -426,6 +391,7 @@ export class OfflineCompiler {
         x: col.x[i],
         y: col.y[i],
         angle: col.a[i],
+        scale: col.s ? col.s[i] : 1.0,
         descriptors: col.d.slice(i * 84, (i + 1) * 84),
       });
     }
@@ -448,9 +414,6 @@ export class OfflineCompiler {
     };
   }
 
-  /**
-   * Destruye el pool de workers
-   */
   async destroy() {
     if (this.workerPool) {
       await this.workerPool.destroy();

@@ -1,4 +1,4 @@
-import { Detector } from "./detector.js";
+import { DetectorLite } from "./detector-lite.js";
 
 class CropDetector {
   constructor(width, height, debugMode = false) {
@@ -11,17 +11,18 @@ class CropDetector {
     let cropSize = Math.pow(2, Math.round(Math.log(minDimension) / Math.log(2)));
     this.cropSize = cropSize;
 
-    this.detector = new Detector(cropSize, cropSize, debugMode);
+    this.detector = new DetectorLite(cropSize, cropSize);
 
-    this.kernelCaches = {};
     this.lastRandomIndex = 4;
   }
 
-  detect(inputImageT) {
+  detect(input) {
+    const imageData = input;
+
     // crop center
     const startY = Math.floor(this.height / 2 - this.cropSize / 2);
     const startX = Math.floor(this.width / 2 - this.cropSize / 2);
-    const result = this._detect(inputImageT, startX, startY);
+    const result = this._detect(imageData, startX, startY);
 
     if (this.debugMode) {
       result.debugExtra.crop = { startX, startY, cropSize: this.cropSize };
@@ -29,7 +30,9 @@ class CropDetector {
     return result;
   }
 
-  detectMoving(inputImageT) {
+  detectMoving(input) {
+    const imageData = input;
+
     // loop a few locations around center
     const dx = this.lastRandomIndex % 3;
     const dy = Math.floor(this.lastRandomIndex / 3);
@@ -44,22 +47,30 @@ class CropDetector {
 
     this.lastRandomIndex = (this.lastRandomIndex + 1) % 9;
 
-    const result = this._detect(inputImageT, startX, startY);
+    const result = this._detect(imageData, startX, startY);
     return result;
   }
 
-  _detect(inputImageT, startX, startY) {
-    const cropInputImageT = inputImageT.slice([startY, startX], [this.cropSize, this.cropSize]);
-    const { featurePoints, debugExtra } = this.detector.detect(cropInputImageT);
+  _detect(imageData, startX, startY) {
+    // Crop manually since imageData is now a flat array (width * height)
+    const croppedData = new Float32Array(this.cropSize * this.cropSize);
+    for (let y = 0; y < this.cropSize; y++) {
+      for (let x = 0; x < this.cropSize; x++) {
+        croppedData[y * this.cropSize + x] = imageData[(startY + y) * this.width + (startX + x)];
+      }
+    }
+
+    const { featurePoints } = this.detector.detect(croppedData);
+
     featurePoints.forEach((p) => {
       p.x += startX;
       p.y += startY;
     });
-    if (this.debugMode) {
-      debugExtra.projectedImage = cropInputImageT.arraySync();
-    }
-    cropInputImageT.dispose();
-    return { featurePoints: featurePoints, debugExtra };
+
+    return {
+      featurePoints,
+      debugExtra: this.debugMode ? { projectedImage: Array.from(croppedData) } : {}
+    };
   }
 }
 

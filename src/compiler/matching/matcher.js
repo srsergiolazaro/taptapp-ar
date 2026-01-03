@@ -47,8 +47,8 @@ class Matcher {
         y: querypoint.y,
       });
       worldCoords.push({
-        x: (keypoint.x + 0.5) / keyframe.scale,
-        y: (keypoint.y + 0.5) / keyframe.scale,
+        x: (keypoint.x + 0.5) / (keyframe.s || keyframe.scale || 1.0),
+        y: (keypoint.y + 0.5) / (keyframe.s || keyframe.scale || 1.0),
         z: 0,
       });
     }

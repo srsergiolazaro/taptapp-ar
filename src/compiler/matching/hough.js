@@ -35,7 +35,7 @@ const computeHoughMatches = (options) => {
   });
   const medianProjectedDim =
     projectedDims[
-      Math.floor(projectedDims.length / 2) - (projectedDims.length % 2 == 0 ? 1 : 0) - 1
+    Math.floor(projectedDims.length / 2) - (projectedDims.length % 2 == 0 ? 1 : 0) - 1
     ];
 
   const binSize = 0.25 * medianProjectedDim;

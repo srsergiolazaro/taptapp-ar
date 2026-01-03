@@ -1,12 +1,19 @@
-import { memory, nextFrame } from "@tensorflow/tfjs";
-
-const tf = { memory, nextFrame };
-import ControllerWorker from "./controller.worker.js?worker&inline";
 import { Tracker } from "./tracker/tracker.js";
 import { CropDetector } from "./detector/crop-detector.js";
-import { Compiler } from "./compiler.js";
+import { OfflineCompiler as Compiler } from "./offline-compiler.js";
 import { InputLoader } from "./input-loader.js";
 import { OneEuroFilter } from "../libs/one-euro-filter.js";
+
+let ControllerWorker;
+
+// Conditional import for worker to avoid crash in non-vite environments
+try {
+  const workerModule = await import("./controller.worker.js?worker&inline");
+  ControllerWorker = workerModule.default;
+} catch (e) {
+  // Fallback for tests or other environments
+  ControllerWorker = null;
+}
 
 const DEFAULT_FILTER_CUTOFF = 0.001; // 1Hz. time period in milliseconds
 const DEFAULT_FILTER_BETA = 1000;
@@ -24,6 +31,7 @@ class Controller {
     missTolerance = null,
     filterMinCF = null,
     filterBeta = null,
+    worker = null, // Allow custom worker injection
   }) {
     this.inputWidth = inputWidth;
     this.inputHeight = inputHeight;
@@ -40,14 +48,14 @@ class Controller {
     this.processingVideo = false;
     this.interestedTargetIndex = -1;
     this.trackingStates = [];
+    this.worker = worker;
+    if (this.worker) this._setupWorkerListener();
 
     const near = 10;
     const far = 100000;
-    const fovy = (45.0 * Math.PI) / 180; // 45 in radian. field of view vertical
+    const fovy = (45.0 * Math.PI) / 180;
     const f = this.inputHeight / 2 / Math.tan(fovy / 2);
-    //     [fx  s cx]
-    // K = [ 0 fx cy]
-    //     [ 0  0  1]
+
     this.projectionTransform = [
       [f, 0, this.inputWidth / 2],
       [0, f, this.inputHeight / 2],
@@ -61,10 +69,10 @@ class Controller {
       near: near,
       far: far,
     });
+  }
 
-    this.worker = new ControllerWorker(); //new Worker(new URL('./controller.worker.js', import.meta.url));
-    this.workerMatchDone = null;
-    this.workerTrackDone = null;
+  _setupWorkerListener() {
+    if (!this.worker) return;
     this.worker.onmessage = (e) => {
       if (e.data.type === "matchDone" && this.workerMatchDone !== null) {
         this.workerMatchDone(e.data);
@@ -75,9 +83,12 @@ class Controller {
     };
   }
 
-  showTFStats() {
-    console.log(tf.memory().numTensors);
-    console.table(tf.memory());
+  _ensureWorker() {
+    if (this.worker) return;
+    if (ControllerWorker) {
+      this.worker = new ControllerWorker();
+      this._setupWorkerListener();
+    }
   }
 
   addImageTargets(fileURL) {
@@ -97,9 +108,10 @@ class Controller {
     const matchingDataList = [];
     const dimensions = [];
     for (let i = 0; i < dataList.length; i++) {
-      matchingDataList.push(dataList[i].matchingData);
-      trackingDataList.push(dataList[i].trackingData);
-      dimensions.push([dataList[i].targetImage.width, dataList[i].targetImage.height]);
+      const item = dataList[i];
+      matchingDataList.push(item.matchingData);
+      trackingDataList.push(item.trackingData);
+      dimensions.push([item.targetImage.width, item.targetImage.height]);
     }
 
     this.tracker = new Tracker(
@@ -111,33 +123,34 @@ class Controller {
       this.debugMode,
     );
 
-    this.worker.postMessage({
-      type: "setup",
-      inputWidth: this.inputWidth,
-      inputHeight: this.inputHeight,
-      projectionTransform: this.projectionTransform,
-      debugMode: this.debugMode,
-      matchingDataList,
-    });
+    this._ensureWorker();
+    if (this.worker) {
+      this.worker.postMessage({
+        type: "setup",
+        inputWidth: this.inputWidth,
+        inputHeight: this.inputHeight,
+        projectionTransform: this.projectionTransform,
+        debugMode: this.debugMode,
+        matchingDataList,
+      });
+    }
 
     this.markerDimensions = dimensions;
-
-    return { dimensions: dimensions, matchingDataList, trackingDataList };
+    return { dimensions, matchingDataList, trackingDataList };
   }
 
   dispose() {
     this.stopProcessVideo();
-    this.worker.postMessage({
-      type: "dispose",
-    });
+    if (this.worker) {
+      this.worker.postMessage({ type: "dispose" });
+      this.worker = null;
+    }
   }
 
-  // warm up gpu - build kernels is slow
   dummyRun(input) {
-    const inputT = this.inputLoader.loadInput(input);
-    this.cropDetector.detect(inputT);
-    this.tracker.dummyRun(inputT);
-    inputT.dispose();
+    const inputData = this.inputLoader.loadInput(input);
+    this.cropDetector.detect(inputData);
+    this.tracker.dummyRun(inputData);
   }
 
   getProjectionMatrix() {
@@ -176,17 +189,17 @@ class Controller {
     return this._glModelViewMatrix(modelViewTransform, targetIndex);
   }
 
-  async _detectAndMatch(inputT, targetIndexes) {
-    const { featurePoints } = this.cropDetector.detectMoving(inputT);
+  async _detectAndMatch(inputData, targetIndexes) {
+    const { featurePoints } = this.cropDetector.detectMoving(inputData);
     const { targetIndex: matchedTargetIndex, modelViewTransform } = await this._workerMatch(
       featurePoints,
       targetIndexes,
     );
     return { targetIndex: matchedTargetIndex, modelViewTransform };
   }
-  async _trackAndUpdate(inputT, lastModelViewTransform, targetIndex) {
+  async _trackAndUpdate(inputData, lastModelViewTransform, targetIndex) {
     const { worldCoords, screenCoords } = this.tracker.track(
-      inputT,
+      inputData,
       lastModelViewTransform,
       targetIndex,
     );
@@ -213,14 +226,13 @@ class Controller {
         trackMiss: 0,
         filter: new OneEuroFilter({ minCutOff: this.filterMinCF, beta: this.filterBeta }),
       });
-      //console.log("filterMinCF", this.filterMinCF, this.filterBeta);
     }
 
     const startProcessing = async () => {
       while (true) {
         if (!this.processingVideo) break;
 
-        const inputT = this.inputLoader.loadInput(input);
+        const inputData = this.inputLoader.loadInput(input);
 
         const nTracking = this.trackingStates.reduce((acc, s) => {
           return acc + (!!s.isTracking ? 1 : 0);
@@ -238,7 +250,7 @@ class Controller {
           }
 
           const { targetIndex: matchedTargetIndex, modelViewTransform } =
-            await this._detectAndMatch(inputT, matchingIndexes);
+            await this._detectAndMatch(inputData, matchingIndexes);
 
           if (matchedTargetIndex !== -1) {
             this.trackingStates[matchedTargetIndex].isTracking = true;
@@ -252,7 +264,7 @@ class Controller {
 
           if (trackingState.isTracking) {
             let modelViewTransform = await this._trackAndUpdate(
-              inputT,
+              inputData,
               trackingState.currentModelViewTransform,
               i,
             );
@@ -314,9 +326,14 @@ class Controller {
           }
         }
 
-        inputT.dispose();
         this.onUpdate && this.onUpdate({ type: "processDone" });
-        await tf.nextFrame();
+
+        // Use requestAnimationFrame if available, otherwise just wait briefly
+        if (typeof requestAnimationFrame !== "undefined") {
+          await new Promise(requestAnimationFrame);
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 16));
+        }
       }
     };
     startProcessing();
@@ -327,23 +344,21 @@ class Controller {
   }
 
   async detect(input) {
-    const inputT = this.inputLoader.loadInput(input);
-    const { featurePoints, debugExtra } = this.cropDetector.detect(inputT);
-    inputT.dispose();
+    const inputData = this.inputLoader.loadInput(input);
+    const { featurePoints, debugExtra } = this.cropDetector.detect(inputData);
     return { featurePoints, debugExtra };
   }
 
   async match(featurePoints, targetIndex) {
-    const { modelViewTransform, debugExtra } = await this._workerMatch(featurePoints, [
+    const { targetIndex: matchedTargetIndex, modelViewTransform, debugExtra } = await this._workerMatch(featurePoints, [
       targetIndex,
     ]);
-    return { modelViewTransform, debugExtra };
+    return { targetIndex: matchedTargetIndex, modelViewTransform, debugExtra };
   }
 
   async track(input, modelViewTransform, targetIndex) {
-    const inputT = this.inputLoader.loadInput(input);
-    const result = this.tracker.track(inputT, modelViewTransform, targetIndex);
-    inputT.dispose();
+    const inputData = this.inputLoader.loadInput(input);
+    const result = this.tracker.track(inputData, modelViewTransform, targetIndex);
     return result;
   }
 
@@ -362,7 +377,7 @@ class Controller {
           debugExtra: data.debugExtra,
         });
       };
-      this.worker.postMessage({ type: "match", featurePoints: featurePoints, targetIndexes });
+      this.worker && this.worker.postMessage({ type: "match", featurePoints: featurePoints, targetIndexes });
     });
   }
 
@@ -372,7 +387,7 @@ class Controller {
         resolve(data.modelViewTransform);
       };
       const { worldCoords, screenCoords } = trackingFeatures;
-      this.worker.postMessage({
+      this.worker && this.worker.postMessage({
         type: "trackUpdate",
         modelViewTransform,
         worldCoords,
@@ -384,41 +399,6 @@ class Controller {
   _glModelViewMatrix(modelViewTransform, targetIndex) {
     const height = this.markerDimensions[targetIndex][1];
 
-    // Question: can someone verify this interpreation is correct?
-    // I'm not very convinced, but more like trial and error and works......
-    //
-    // First, opengl has y coordinate system go from bottom to top, while the marker corrdinate goes from top to bottom,
-    //    since the modelViewTransform is estimated in marker coordinate, we need to apply this transform before modelViewTransform
-    //    I can see why y = h - y*, but why z = z* ? should we intepret it as rotate 90 deg along x-axis and then translate y by h?
-    //
-    //    [1  0  0  0]
-    //    [0 -1  0  h]
-    //    [0  0 -1  0]
-    //    [0  0  0  1]
-    //
-    //    This is tested that if we reverse marker coordinate from bottom to top and estimate the modelViewTransform,
-    //    then the above matrix is not necessary.
-    //
-    // Second, in opengl, positive z is away from camera, so we rotate 90 deg along x-axis after transform to fix the axis mismatch
-    //    [1  1  0  0]
-    //    [0 -1  0  0]
-    //    [0  0 -1  0]
-    //    [0  0  0  1]
-    //
-    // all together, the combined matrix is
-    //
-    //    [1  1  0  0]   [m00, m01, m02, m03]   [1  0  0  0]
-    //    [0 -1  0  0]   [m10, m11, m12, m13]   [0 -1  0  h]
-    //    [0  0 -1  0]   [m20, m21, m22, m23]   [0  0 -1  0]
-    //    [0  0  0  1]   [  0    0    0    1]   [0  0  0  1]
-    //
-    //    [ m00,  -m01,  -m02,  (m01 * h + m03) ]
-    //    [-m10,   m11,   m12, -(m11 * h + m13) ]
-    //  = [-m20,   m21,   m22, -(m21 * h + m23) ]
-    //    [   0,     0,     0,                1 ]
-    //
-    //
-    // Finally, in threejs, matrix is represented in col by row, so we transpose it, and get below:
     const openGLWorldMatrix = [
       modelViewTransform[0][0],
       -modelViewTransform[1][0],
@@ -440,8 +420,6 @@ class Controller {
     return openGLWorldMatrix;
   }
 
-  // build openGL projection matrix
-  // ref: https://strawlab.org/2011/11/05/augmented-reality-with-OpenGL/
   _glProjectionMatrix({ projectionTransform, width, height, near, far }) {
     const proj = [
       [

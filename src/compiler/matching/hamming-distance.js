@@ -7,11 +7,11 @@ for (let i = 0; i < 256; i++) {
 }
 
 const compute = (options) => {
-  const { v1, v2 } = options;
+  const { v1, v2, v1Offset = 0, v2Offset = 0 } = options;
   let d = 0;
-  const len = v1.length;
-  for (let i = 0; i < len; i++) {
-    d += BIT_COUNT_8[v1[i] ^ v2[i]];
+  // FREAK descriptors are 84 bytes
+  for (let i = 0; i < 84; i++) {
+    d += BIT_COUNT_8[v1[v1Offset + i] ^ v2[v2Offset + i]];
   }
   return d;
 };

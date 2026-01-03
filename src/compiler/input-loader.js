@@ -1,106 +1,80 @@
-import * as tf from "@tensorflow/tfjs";
-
-// More efficient implementation for tf.browser.fromPixels
-//   original implementation: /node_modules/@tensorflow/tfjs-backend-webgl/src/kernels/FromPixels.ts
-//
-// This implementation return grey scale instead of RGBA in the orignal implementation
-
+/**
+ * InputLoader - Maneja la carga de imágenes y video sin TensorFlow
+ */
 class InputLoader {
   constructor(width, height) {
     this.width = width;
     this.height = height;
-    this.texShape = [height, width];
+    this.grayscaleBuffer = new Uint8Array(width * height);
 
-    const context = document.createElement("canvas").getContext("2d");
-    context.canvas.width = width;
-    context.canvas.height = height;
-    this.context = context;
-
-    this.program = this.buildProgram(width, height);
-
-    const backend = tf.backend();
-    //this.tempPixelHandle = backend.makeTensorInfo(this.texShape, 'int32');
-    this.tempPixelHandle = backend.makeTensorInfo(this.texShape, "float32");
-    // warning!!!
-    // usage type should be TextureUsage.PIXELS, but tfjs didn't export this enum type, so we hard-coded 2 here
-    //   i.e. backend.texData.get(tempPixelHandle.dataId).usage = TextureUsage.PIXELS;
-    backend.texData.get(this.tempPixelHandle.dataId).usage = 2;
+    if (typeof document !== "undefined") {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      this.context = canvas.getContext("2d", { willReadFrequently: true, alpha: false });
+    }
   }
 
-  // old method
-  _loadInput(input) {
-    return tf.tidy(() => {
-      let inputImage = tf.browser.fromPixels(input);
-      inputImage = inputImage.mean(2);
-      return inputImage;
-    });
-  }
-
-  // input is instance of HTMLVideoElement or HTMLImageElement
+  /**
+   * Carga una imagen o video y devuelve los datos en escala de grises
+   * @param {HTMLVideoElement|HTMLImageElement|ImageData|Uint8Array} input - La fuente de entrada
+   * @returns {Uint8Array} Datos de imagen en escala de grises (width * height)
+   */
   loadInput(input) {
-    const context = this.context;
-    context.clearRect(0, 0, this.context.canvas.width, this.context.canvas.height);
-
-    const isInputRotated = input.width === this.height && input.height === this.width;
-    if (isInputRotated) {
-      // rotate 90 degree and draw
-      let x = this.context.canvas.width / 2;
-      let y = this.context.canvas.height / 2;
-      let angleInDegrees = 90;
-
-      context.save(); // save the current context state
-      context.translate(x, y); // move the context origin to the center of the image
-      context.rotate((angleInDegrees * Math.PI) / 180); // rotate the context
-
-      // draw the image with its center at the origin
-      context.drawImage(input, -input.width / 2, -input.height / 2);
-      context.restore(); // restore the context to its original state
-    } else {
-      this.context.drawImage(input, 0, 0, input.width, input.height);
+    // Si ya es un Uint8Array de escala de grises, lo devolvemos
+    if (input instanceof Uint8Array && input.length === this.width * this.height) {
+      return input;
     }
 
-    const backend = tf.backend();
-    backend.gpgpu.uploadPixelDataToTexture(
-      backend.getTexture(this.tempPixelHandle.dataId),
-      this.context.canvas,
-    );
+    // Si es ImageData, convertimos a escala de grises directamente
+    if (typeof ImageData !== "undefined" && input instanceof ImageData) {
+      this._convertToGrayscale(input.data, input.width, input.height);
+      return this.grayscaleBuffer;
+    }
 
-    //const res = backend.compileAndRun(this.program, [this.tempPixelHandle]);
-    const res = this._compileAndRun(this.program, [this.tempPixelHandle]);
-    //const res = this._runWebGLProgram(this.program, [this.tempPixelHandle], 'float32');
-    //backend.disposeData(tempPixelHandle.dataId);
-    return res;
+    // En el navegador, usamos canvas para procesar video/imágenes
+    if (this.context) {
+      this.context.clearRect(0, 0, this.width, this.height);
+
+      const isInputRotated = input.width === this.height && input.height === this.width;
+
+      if (isInputRotated) {
+        this.context.save();
+        this.context.translate(this.width / 2, this.height / 2);
+        this.context.rotate(Math.PI / 2);
+        this.context.drawImage(input, -input.width / 2, -input.height / 2);
+        this.context.restore();
+      } else {
+        this.context.drawImage(input, 0, 0, this.width, this.height);
+      }
+
+      const imageData = this.context.getImageData(0, 0, this.width, this.height);
+      this._convertToGrayscale(imageData.data, this.width, this.height);
+      return this.grayscaleBuffer;
+    }
+
+    // Fallback para Node.js o entornos sin DOM
+    if (input.data && input.data instanceof Uint8Array) {
+      this._convertToGrayscale(input.data, input.width || this.width, input.height || this.height);
+      return this.grayscaleBuffer;
+    }
+
+    throw new Error("Input no soportado o entorno sin Canvas");
   }
 
-  buildProgram(width, height) {
-    const textureMethod = tf.env().getNumber("WEBGL_VERSION") === 2 ? "texture" : "texture2D";
+  /**
+   * Convierte datos RGBA a escala de grises optimizada (reutilizando buffer)
+   */
+  _convertToGrayscale(rgbaData, width, height) {
+    const grayscale = this.grayscaleBuffer;
+    const len = (width * height);
 
-    const program = {
-      variableNames: ["A"],
-      outputShape: this.texShape,
-      userCode: `
-	void main() {
-	  ivec2 coords = getOutputCoords();
-	  int texR = coords[0];
-	  int texC = coords[1];
-	  vec2 uv = (vec2(texC, texR) + halfCR) / vec2(${width}.0, ${height}.0);
-
-	  vec4 values = ${textureMethod}(A, uv);
-	  setOutput((0.299 * values.r + 0.587 * values.g + 0.114 * values.b) * 255.0);
-	}
-      `,
-    };
-    return program;
-  }
-
-  _compileAndRun(program, inputs) {
-    const outInfo = tf.backend().compileAndRun(program, inputs);
-    return tf.engine().makeTensor(outInfo.dataId, outInfo.shape, outInfo.dtype);
-  }
-
-  _runWebGLProgram(program, inputs, outputType) {
-    const outInfo = tf.backend().runWebGLProgram(program, inputs, outputType);
-    return tf.engine().makeTensor(outInfo.dataId, outInfo.shape, outInfo.dtype);
+    // Optimized loop with bitwise ops
+    for (let i = 0; i < len; i++) {
+      const offset = i << 2;
+      // Formula de luminosidad estándar: 0.299R + 0.587G + 0.114B (scaled by 256)
+      grayscale[i] = (rgbaData[offset] * 77 + rgbaData[offset + 1] * 150 + rgbaData[offset + 2] * 29) >> 8;
+    }
   }
 }
 

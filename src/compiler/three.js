@@ -8,8 +8,6 @@ import {
   Group,
   sRGBEncoding,
 } from "three";
-import * as tf from "@tensorflow/tfjs";
-//import { CSS3DRenderer } from '../libs/CSS3DRenderer.js';
 import { CSS3DRenderer } from "three/addons/renderers/CSS3DRenderer.js";
 import { Controller } from "./controller.js";
 import { UI } from "../ui/ui.js";
@@ -362,5 +360,3 @@ if (!window.MINDAR.IMAGE) {
 }
 
 window.MINDAR.IMAGE.MindARThree = MindARThree;
-//window.MINDAR.IMAGE.THREE = THREE;
-window.MINDAR.IMAGE.tf = tf;
