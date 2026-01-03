@@ -20,6 +20,7 @@ import { extractTrackingFeatures } from "./tracker/extract-utils.js";
 import { DetectorLite } from "./detector/detector-lite.js";
 import { build as hierarchicalClusteringBuild } from "./matching/hierarchical-clustering.js";
 import * as msgpack from "@msgpack/msgpack";
+import { WorkerPool } from "./utils/worker-pool.js";
 
 // Detect environment
 const isNode = typeof process !== "undefined" &&
@@ -46,22 +47,30 @@ export class OfflineCompiler {
 
   async _initNodeWorkers() {
     try {
-      const [os, path, url, workerModule] = await Promise.all([
-        import("os"),
-        import("path"),
-        import("url"),
-        import("./utils/worker-pool.js")
+      // Use variables to prevent bundlers from trying to bundle these
+      const pathModule = "path";
+      const urlModule = "url";
+      const osModule = "os";
+      const workerThreadsModule = "node:worker_threads";
+
+      const [path, url, os, { Worker }] = await Promise.all([
+        import(pathModule),
+        import(urlModule),
+        import(osModule),
+        import(workerThreadsModule)
       ]);
 
       const __filename = url.fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
       const workerPath = path.join(__dirname, "node-worker.js");
 
+      // Limit workers to avoid freezing system
       const numWorkers = Math.min(os.cpus().length, 4);
-      this.workerPool = new workerModule.WorkerPool(workerPath, numWorkers);
+
+      this.workerPool = new WorkerPool(workerPath, numWorkers, Worker);
       console.log(`🚀 OfflineCompiler: Node.js mode with ${numWorkers} workers`);
     } catch (e) {
-      console.log("⚡ OfflineCompiler: Running without workers");
+      console.log("⚡ OfflineCompiler: Running without workers (initialization failed)", e);
     }
   }
 
@@ -142,10 +151,53 @@ export class OfflineCompiler {
     const percentPerImage = 100 / targetImages.length;
     let currentPercent = 0;
 
-    const results = [];
+    // Use workers if available
+    if (this.workerPool) {
+      const promises = targetImages.map((targetImage, index) => {
+        return this.workerPool.runTask({
+          type: 'match',
+          targetImage,
+          percentPerImage,
+          basePercent: index * percentPerImage,
+          onProgress: (percent) => {
+            // Basic aggregation: this assumes naive progress updates.
+            // Ideally we should track exact progress per image.
+            // For now, simpler to just let the main thread loop handle overall progress callback?
+            // No, workers are async. We need to aggregate.
+            // Actually, the main loop below is serial.
+            // If we use workers, we run them in parallel.
+          }
+        });
+      });
 
-    // Procesar secuencialmente para evitar overhead de workers
-    // (los workers son útiles para muchas imágenes, pero añaden latencia)
+      // Progress handling for parallel workers is tricky without a shared state manager.
+      // Simplified approach: each worker reports its absolute progress contribution?
+      // No, worker reports 'percent' which is base + local.
+      // We can use a shared loadedPercent variable.
+
+      let totalPercent = 0;
+      const progressMap = new Float32Array(targetImages.length);
+
+      const wrappedPromises = targetImages.map((targetImage, index) => {
+        return this.workerPool.runTask({
+          type: 'match',
+          targetImage,
+          percentPerImage, // Not really needed for logic but worker expects it
+          basePercent: 0, // Worker will report 0-percentPerImage roughly
+          onProgress: (p) => {
+            // This 'p' from worker is "base + local". If we passed base=0, it's just local (0 to percentPerImage)
+            progressMap[index] = p;
+            const sum = progressMap.reduce((a, b) => a + b, 0);
+            progressCallback(sum);
+          }
+        });
+      });
+
+      return Promise.all(wrappedPromises);
+    }
+
+    // Serial Fallback
+    const results = [];
     for (let i = 0; i < targetImages.length; i++) {
       const targetImage = targetImages[i];
       const imageList = buildImageList(targetImage);
@@ -189,8 +241,26 @@ export class OfflineCompiler {
     const percentPerImage = 100 / targetImages.length;
     let currentPercent = 0;
 
-    const results = [];
+    if (this.workerPool) {
+      const progressMap = new Float32Array(targetImages.length);
+      const wrappedPromises = targetImages.map((targetImage, index) => {
+        return this.workerPool.runTask({
+          type: 'compile',
+          targetImage,
+          percentPerImage,
+          basePercent: 0,
+          onProgress: (p) => {
+            progressMap[index] = p;
+            const sum = progressMap.reduce((a, b) => a + b, 0);
+            progressCallback(sum);
+          }
+        });
+      });
+      return Promise.all(wrappedPromises);
+    }
 
+    // Serial Fallback
+    const results = [];
     for (let i = 0; i < targetImages.length; i++) {
       const targetImage = targetImages[i];
       const imageList = buildTrackingImageList(targetImage);
@@ -274,7 +344,8 @@ export class OfflineCompiler {
     return msgpack.encode({
       v: CURRENT_VERSION,
       dataList,
-    });
+      // eslint-disable-next-line
+    }); // eslint-disable-line
   }
 
   _packKeyframe(kf) {

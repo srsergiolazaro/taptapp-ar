@@ -1,10 +1,9 @@
-import { Worker } from 'node:worker_threads';
-import os from 'node:os';
 
 export class WorkerPool {
-    constructor(workerPath, poolSize = os.cpus().length) {
+    constructor(workerPath, poolSize, WorkerClass) {
         this.workerPath = workerPath;
         this.poolSize = poolSize;
+        this.WorkerClass = WorkerClass;
         this.workers = [];
         this.queue = [];
         this.activeWorkers = 0;
@@ -25,7 +24,7 @@ export class WorkerPool {
 
     _createWorker() {
         this.activeWorkers++;
-        const worker = new Worker(this.workerPath);
+        const worker = new this.WorkerClass(this.workerPath);
         return worker;
     }
 
@@ -66,10 +65,7 @@ export class WorkerPool {
             }
         }
 
-        worker.postMessage({
-            type: 'compile',
-            ...serializableData
-        });
+        worker.postMessage(serializableData);
     }
 
     _finishTask(worker, callback, result) {
