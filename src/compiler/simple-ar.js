@@ -17,6 +17,17 @@ import { Controller } from "./controller.js";
  * await ar.start();
  */
 class SimpleAR {
+    /**
+     * @param {Object} options
+     * @param {HTMLElement} options.container
+     * @param {string|string[]} options.targetSrc
+     * @param {HTMLElement} options.overlay
+     * @param {number} [options.scale=1.0]
+     * @param {((data: {targetIndex: number}) => void | Promise<void>) | null} [options.onFound]
+     * @param {((data: {targetIndex: number}) => void | Promise<void>) | null} [options.onLost]
+     * @param {((data: {targetIndex: number, worldMatrix: number[]}) => void) | null} [options.onUpdate]
+     * @param {Object} [options.cameraConfig]
+     */
     constructor({
         container,
         targetSrc,
@@ -59,6 +70,7 @@ class SimpleAR {
         const targets = Array.isArray(this.targetSrc) ? this.targetSrc : [this.targetSrc];
         const result = await this.controller.addImageTargets(targets);
         this.markerDimensions = result.dimensions; // [ [w1, h1], [w2, h2], ... ]
+        console.log("Targets loaded. Dimensions:", this.markerDimensions);
 
         this.controller.processVideo(this.video);
 
@@ -186,9 +198,6 @@ class SimpleAR {
         let screenX, screenY, rotation;
 
         if (needsRotation) {
-            // Mapping for 90deg clockwise rotation:
-            // Buffer X (0..videoW) -> Screen Y (0..displayH)
-            // Buffer Y (0..videoH) -> Screen X (displayW..0)
             const bufferOffsetX = (tx * f / tz);
             const bufferOffsetY = (ty * f / tz);
 
@@ -196,9 +205,6 @@ class SimpleAR {
             screenY = offsetY + (displayH / 2) + (bufferOffsetX * perspectiveScale);
             rotation = Math.atan2(mVT[1][0], mVT[0][0]) - Math.PI / 2;
         } else {
-            // Normal mapping:
-            // Buffer X -> Screen X
-            // Buffer Y -> Screen Y
             const bufferOffsetX = (tx * f / tz);
             const bufferOffsetY = (ty * f / tz);
 
@@ -207,12 +213,20 @@ class SimpleAR {
             rotation = Math.atan2(mVT[1][0], mVT[0][0]);
         }
 
-        // Final Scale calculation:
-        // f/tz converts world units to buffer pixels
-        // perspectiveScale converts buffer pixels to screen pixels
-        // matrixScale handles the target's relative orientation in 2D
         const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
         const finalScale = (f / tz) * perspectiveScale * matrixScale * this.scaleMultiplier;
+
+        // DEBUG LOGS
+        if (window.AR_DEBUG) {
+            console.log('--- AR POSITION DEBUG ---');
+            console.log('Container:', containerRect.width, 'x', containerRect.height);
+            console.log('Video:', videoW, 'x', videoH, 'needsRotation:', needsRotation);
+            console.log('PerspectiveScale (Cover):', perspectiveScale);
+            console.log('Display:', displayW, 'x', displayH, 'Offsets:', offsetX, offsetY);
+            console.log('Projection (tx, ty, tz):', tx.toFixed(2), ty.toFixed(2), tz.toFixed(2));
+            console.log('Screen Coords:', screenX.toFixed(2), screenY.toFixed(2));
+            console.log('Final Scale:', finalScale.toFixed(4), '(MatrixScale:', matrixScale.toFixed(4), ')');
+        }
 
         // Apply
         this.overlay.style.width = `${markerW}px`;
