@@ -21,6 +21,7 @@ class SimpleAR {
         container,
         targetSrc,
         overlay,
+        scale = 1.0, // Multiplicador de escala personalizado
         onFound = null,
         onLost = null,
         onUpdate = null,
@@ -29,6 +30,7 @@ class SimpleAR {
         this.container = container;
         this.targetSrc = targetSrc;
         this.overlay = overlay;
+        this.scaleMultiplier = scale;
         this.onFound = onFound;
         this.onLost = onLost;
         this.onUpdateCallback = onUpdate;
@@ -178,7 +180,6 @@ class SimpleAR {
         const scaleY = displayH / videoH;
 
         // Project the center of the marker (markerW/2, markerH/2, 0) into camera space
-        // Marker coordinates are pixels from top-left.
         const tx = mVT[0][0] * (markerW / 2) + mVT[0][1] * (markerH / 2) + mVT[0][3];
         const ty = mVT[1][0] * (markerW / 2) + mVT[1][1] * (markerH / 2) + mVT[1][3];
         const tz = mVT[2][0] * (markerW / 2) + mVT[2][1] * (markerH / 2) + mVT[2][3];
@@ -187,29 +188,32 @@ class SimpleAR {
         const f = videoH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
 
         // Perspective projection to screen space
-        // The estimator returns positive Z for depth, so we divide by tz directly.
+        // Using + for both since t is relative to principal point and Y is down in screen coords.
         const screenX = offsetX + (videoW / 2 + (tx * f / tz)) * scaleX;
-        const screenY = offsetY + (videoH / 2 - (ty * f / tz)) * scaleY;
+        const screenY = offsetY + (videoH / 2 + (ty * f / tz)) * scaleY;
 
-        // Use the first row of mVT to determine rotation and base scale component
+        // Rotation calculation: atan2(y, x) of world X-axis in camera space
         const rotation = Math.atan2(mVT[1][0], mVT[0][0]);
         const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
 
         // Perspective scale: 1 world pixel = (f/tz) screen pixels
         const perspectiveScale = (f / tz) * scaleX;
 
-        // Detect overlay intrinsic size (videoWidth for video, naturalWidth for images)
+        // Detect overlay intrinsic size
         const intrinsicWidth = (this.overlay instanceof HTMLVideoElement)
             ? this.overlay.videoWidth
             : (this.overlay instanceof HTMLImageElement ? this.overlay.naturalWidth : 0);
 
-        // Final scale = (Target Width in Pixels on screen) / (Overlay Intrinsic Width)
-        // If intrinsicWidth is 0 (not loaded), we fallback to a safe 1.0 scale to avoid Infinity
-        const finalScale = intrinsicWidth > 0
+        // Final scale = (Target Width in Pixels on screen) / (Overlay Intrinsic Width) * scaleMultiplier
+        const baseScale = intrinsicWidth > 0
             ? (matrixScale * markerW * perspectiveScale) / intrinsicWidth
             : 1.0;
 
-        // Apply transform
+        const finalScale = baseScale * this.scaleMultiplier;
+
+        // Ensure element doesn't have CSS width that interferes with scaling
+        this.overlay.style.width = 'auto';
+        this.overlay.style.height = 'auto';
         this.overlay.style.position = 'absolute';
         this.overlay.style.transformOrigin = 'center center';
         this.overlay.style.left = '0';
@@ -218,10 +222,9 @@ class SimpleAR {
       translate(${screenX}px, ${screenY}px)
       translate(-50%, -50%)
       scale(${finalScale})
-      rotate(${-rotation}rad)
+      rotate(${rotation}rad)
     `;
     }
-
 }
 
 export { SimpleAR };
