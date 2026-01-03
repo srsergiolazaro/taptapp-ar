@@ -157,11 +157,11 @@ class SimpleAR {
                 this.filters[targetIndex] = new OneEuroFilter({ minCutOff: 0.1, beta: 0.01 });
             }
 
-            // Flatten modelViewTransform for filtering (3x4 matrix = 12 values)
+            // Flatten mVT for filtering (3x4 matrix = 12 values)
             const flatMVT = [
-                modelViewTransform[0][0], modelViewTransform[0][1], modelViewTransform[0][2], modelViewTransform[0][3],
-                modelViewTransform[1][0], modelViewTransform[1][1], modelViewTransform[1][2], modelViewTransform[1][3],
-                modelViewTransform[2][0], modelViewTransform[2][1], modelViewTransform[2][2], modelViewTransform[2][3]
+                mVT[0][0], mVT[0][1], mVT[0][2], mVT[0][3],
+                mVT[1][0], mVT[1][1], mVT[1][2], mVT[1][3],
+                mVT[2][0], mVT[2][1], mVT[2][2], mVT[2][3]
             ];
             const smoothedFlat = this.filters[targetIndex].filter(Date.now(), flatMVT);
             const smoothedMVT = [
