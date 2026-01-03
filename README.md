@@ -1,18 +1,18 @@
 # @srsergio/taptapp-ar
 
-🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) toolkit specifically designed for **Astro** and **Node.js** environments. It provides a seamless way to integrate image tracking, video overlays, and an offline compiler for image targets.
+🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) compiler toolkit for **Node.js** and **Browser** environments. It provides an ultra-fast offline compiler for image targets.
 
-Built on top of **MindAR** and **A-Frame**, this package features a **pure JavaScript offline compiler** that requires **no TensorFlow** for backend compilation, while still supporting TensorFlow.js for real-time tracking in the browser.
+Built with performance in mind, this package features a **pure JavaScript offline compiler** that requires **no TensorFlow** for compilation, generating high-quality `.mind` files in record time.
 
 ---
 
 ## 🌟 Key Features
 
-- 🚀 **Astro Native**: Optimized components for Astro's Islands architecture.
 - 🖼️ **Ultra-Fast Offline Compiler**: Pure JavaScript compiler that generates `.mind` target files in **~1.3s per image**.
 - ⚡ **Zero TensorFlow for Compilation**: The offline compiler uses optimized pure JS algorithms - no TensorFlow installation required.
 - 🧵 **Multi-threaded Engine**: Truly parallel processing using Node.js `worker_threads` for bulk image compilation.
 - 🚀 **Serverless Ready**: Lightweight compiler with minimal dependencies, perfect for Vercel, AWS Lambda, and Netlify.
+- 📦 **Protocol V3 (Columnar Binary)**: Industry-leading performance with zero-copy loading and 80%+ smaller files.
 
 ---
 
@@ -25,34 +25,6 @@ npm install @srsergio/taptapp-ar
 ### 📦 Optional Dependencies
 
 > **Note:** TensorFlow is **NOT required** for the offline compiler. It only uses pure JavaScript.
-
-For real-time AR tracking in the browser, TensorFlow.js is loaded automatically via CDN.
-
----
-
-## 🚀 Astro Integration Guide
-
-The easiest way to display AR content is using the `ARVideoTrigger` component.
-
-### Usage
-
-```astro
----
-import ARVideoTrigger from '@srsergio/taptapp-ar/astro/ARVideoTrigger.astro';
-
-const config = {
-  cardId: 'unique-id',
-  targetImageSrc: 'https://cdn.example.com/target.jpg',
-  targetMindSrc: 'https://cdn.example.com/targets.mind',
-  videoSrc: 'https://cdn.example.com/overlay.mp4',
-  videoWidth: 1280,
-  videoHeight: 720,
-  scale: 1.2,
-};
----
-
-<ARVideoTrigger config={config} />
-```
 
 ---
 
@@ -83,7 +55,7 @@ TaptApp AR features the industry's most advanced **pure JavaScript** offline com
 Optimized for server-side compilation with multi-core parallelism:
 
 ```javascript
-import { OfflineCompiler } from '@srsergio/taptapp-ar/compiler/offline-compiler.js';
+import { OfflineCompiler } from '@srsergio/taptapp-ar';
 
 const compiler = new OfflineCompiler();
 
@@ -100,22 +72,12 @@ const binaryBuffer = compiler.exportData(); // Yields a much smaller .mind file
 ### 🌐 Frontend (Zero-Latency Loading)
 
 ```javascript
-import { OfflineCompiler } from '@srsergio/taptapp-ar/compiler/offline-compiler.js';
+import { OfflineCompiler } from '@srsergio/taptapp-ar';
 
 const compiler = new OfflineCompiler();
 // Loading 127KB instead of 800KB saves bandwidth and CPU parsing time
 compiler.importData(binaryBuffer); 
 ```
----
-
-## ❓ Troubleshooting
-
-| Issue | Solution |
-| :--- | :--- |
-| **Camera not starting** | Ensure your site is served via `HTTPS`. Browsers block camera access on insecure origins. |
-| **Video not playing** | iOS Safari requires `muted` and `playsinline` attributes for autoplaying videos. Our components handle this by default. |
-| **CORS errors** | Ensure that `targetImageSrc`, `targetMindSrc`, and `videoSrc` have CORS headers enabled (`Access-Control-Allow-Origin: *`). |
-| **Memory Outage on Serverless** | Reduce the resolution of your target images. High-res images increase memory pressure during compilation. |
 
 ---
 
