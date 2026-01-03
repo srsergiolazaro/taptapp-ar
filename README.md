@@ -95,26 +95,86 @@ renderer.setAnimationLoop(() => {
 });
 ```
 
-### 3. Raw Controller (Custom Logic)
-Use the `Controller` directly for maximum control:
+### 3. Raw Controller (Advanced & Custom Engines)
+The `Controller` is the core engine of TapTapp AR. You can use it to build your own AR components or integrate tracking into custom 3D engines.
+
+#### ⚙️ Controller Configuration
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `inputWidth` | **Required** | The width of the video or image source. |
+| `inputHeight` | **Required** | The height of the video or image source. |
+| `maxTrack` | `1` | Max number of images to track simultaneously. |
+| `warmupTolerance` | `5` | Frames of consistent detection needed to "lock" a target. |
+| `missTolerance` | `5` | Frames of missed detection before considering the target "lost". |
+| `filterMinCF` | `0.001` | Min cutoff frequency for the OneEuroFilter (reduces jitter). |
+| `filterBeta` | `1000` | Filter beta parameter (higher = more responsive, lower = smoother). |
+| `onUpdate` | `null` | Callback for tracking events (Found, Lost, ProcessDone). |
+| `debugMode` | `false` | If true, returns extra debug data (cropped images, feature points). |
+| `worker` | `null` | Pass a custom worker instance if using a specialized environment. |
+
+#### 🚀 Example: Tracking a Video Stream
+Ideal for real-time AR apps in the browser:
 
 ```javascript
 import { Controller } from '@srsergio/taptapp-ar';
 
 const controller = new Controller({
-  inputWidth: 640,
-  inputHeight: 480,
+  inputWidth: video.videoWidth,
+  inputHeight: video.videoHeight,
   onUpdate: (data) => {
     if (data.type === 'updateMatrix') {
-      // worldMatrix found! Apply to your 3D engine
       const { targetIndex, worldMatrix } = data;
+      if (worldMatrix) {
+        console.log(`Target ${targetIndex} detected! Matrix:`, worldMatrix);
+        // Apply worldMatrix (Float32Array[16]) to your 3D object
+      } else {
+        console.log(`Target ${targetIndex} lost.`);
+      }
     }
   }
 });
 
 await controller.addImageTargets('./targets.mind');
-controller.processVideo(videoElement);
+controller.processVideo(videoElement); // Starts the internal RAF loop
 ```
+
+#### 📸 Example: One-shot Image Matching
+Use this for "Snap and Detect" features without a continuous video loop:
+
+```javascript
+const controller = new Controller({ inputWidth: 1024, inputHeight: 1024 });
+await controller.addImageTargets('./targets.mind');
+
+// 1. Detect features in a static image
+const { featurePoints } = await controller.detect(canvasElement);
+
+// 2. Attempt to match against a specific target index
+const { targetIndex, modelViewTransform } = await controller.match(featurePoints, 0);
+
+if (targetIndex !== -1) {
+  // Found a match! Use modelViewTransform for initial pose estimation
+}
+```
+
+#### 🛠️ Life-cycle Management
+Properly management is crucial to avoid memory leaks:
+
+```javascript
+// Stop the video loop
+controller.stopProcessVideo();
+
+// Clean up workers and internal buffers
+controller.dispose();
+```
+
+---
+
+## 🏗️ Protocol V3 (Columnar Binary Format)
+TapTapp AR uses a proprietary columnar binary format that is significantly more efficient than standard JSON-based formats.
+
+- **Zero-Copy Restoration**: Binary buffers are mapped directly to TypedArrays.
+- **Cache Locality**: Performance is optimized for modern CPUs by keeping coordinates and descriptors adjacent in memory.
+- **Alignment Safe**: Automatically handles `ArrayBuffer` alignment for predictable behavior across all browsers.
 
 ---
 
