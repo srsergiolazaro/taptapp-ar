@@ -163,43 +163,54 @@ class SimpleAR {
         const isVideoLandscape = videoW > videoH;
         const needsRotation = isPortrait && isVideoLandscape;
 
-        // The tracker uses 1280x720. Focal length is based on 720 (sensor height).
-        const f = videoH / 2 / Math.tan((45.0 * Math.PI / 180) / 2);
+        // Current display dimensions of the video (accounting for rotation)
+        const vW = needsRotation ? videoH : videoW;
+        const vH = needsRotation ? videoW : videoH;
 
-        // Project Center of the marker into camera space
+        // Robust "object-fit: cover" scale calculation
+        const perspectiveScale = Math.max(containerRect.width / vW, containerRect.height / vH);
+
+        const displayW = vW * perspectiveScale;
+        const displayH = vH * perspectiveScale;
+        const offsetX = (containerRect.width - displayW) / 2;
+        const offsetY = (containerRect.height - displayH) / 2;
+
+        // The tracker uses focal length based on height dimension in tracker space
+        const f = (videoH / 2) / Math.tan((45.0 * Math.PI / 180) / 2);
+
+        // Center of the marker in camera space (marker coordinates origin at top-left)
         const tx = mVT[0][0] * (markerW / 2) + mVT[0][1] * (markerH / 2) + mVT[0][3];
         const ty = mVT[1][0] * (markerW / 2) + mVT[1][1] * (markerH / 2) + mVT[1][3];
         const tz = mVT[2][0] * (markerW / 2) + mVT[2][1] * (markerH / 2) + mVT[2][3];
 
-        let screenX, screenY, rotation, perspectiveScale;
+        let screenX, screenY, rotation;
 
         if (needsRotation) {
-            // PORTRAIT MOBILE:
-            // Browser rotates 1280 (W) -> vertical, 720 (H) -> horizontal
-            const scale = containerRect.height / videoW;
-            const displayW = videoH * scale;
-            const offsetX = (containerRect.width - displayW) / 2;
+            // Mapping for 90deg clockwise rotation:
+            // Buffer X (0..videoW) -> Screen Y (0..displayH)
+            // Buffer Y (0..videoH) -> Screen X (displayW..0)
+            const bufferOffsetX = (tx * f / tz);
+            const bufferOffsetY = (ty * f / tz);
 
-            // Mapping: Buffer +X (Right) -> Screen +Y (Down), Buffer +Y (Down) -> Screen -X (Left)
-            screenX = offsetX + (displayW / 2 - (ty * f / tz) * scale);
-            screenY = (containerRect.height / 2 + (tx * f / tz) * scale);
-
+            screenX = offsetX + (displayW / 2) - (bufferOffsetY * perspectiveScale);
+            screenY = offsetY + (displayH / 2) + (bufferOffsetX * perspectiveScale);
             rotation = Math.atan2(mVT[1][0], mVT[0][0]) - Math.PI / 2;
-            perspectiveScale = scale;
         } else {
-            // LANDSCAPE / LAPTOP:
-            const scale = containerRect.width / videoW;
-            const displayH = videoH * scale;
-            const offsetY = (containerRect.height - displayH) / 2;
+            // Normal mapping:
+            // Buffer X -> Screen X
+            // Buffer Y -> Screen Y
+            const bufferOffsetX = (tx * f / tz);
+            const bufferOffsetY = (ty * f / tz);
 
-            screenX = (containerRect.width / 2 + (tx * f / tz) * scale);
-            screenY = offsetY + (displayH / 2 + (ty * f / tz) * scale);
-
+            screenX = offsetX + (displayW / 2) + (bufferOffsetX * perspectiveScale);
+            screenY = offsetY + (displayH / 2) + (bufferOffsetY * perspectiveScale);
             rotation = Math.atan2(mVT[1][0], mVT[0][0]);
-            perspectiveScale = scale;
         }
 
-        // Final Scale
+        // Final Scale calculation:
+        // f/tz converts world units to buffer pixels
+        // perspectiveScale converts buffer pixels to screen pixels
+        // matrixScale handles the target's relative orientation in 2D
         const matrixScale = Math.sqrt(mVT[0][0] ** 2 + mVT[1][0] ** 2);
         const finalScale = (f / tz) * perspectiveScale * matrixScale * this.scaleMultiplier;
 
