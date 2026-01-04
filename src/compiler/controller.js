@@ -42,7 +42,7 @@ class Controller {
     this.filterBeta = filterBeta === null ? DEFAULT_FILTER_BETA : filterBeta;
     this.warmupTolerance = warmupTolerance === null ? DEFAULT_WARMUP_TOLERANCE : warmupTolerance;
     this.missTolerance = missTolerance === null ? DEFAULT_MISS_TOLERANCE : missTolerance;
-    this.cropDetector = new CropDetector(this.inputWidth, this.inputHeight, debugMode);
+    this.cropDetector = new CropDetector(this.inputWidth, this.inputHeight, debugMode, true);
     this.inputLoader = new InputLoader(this.inputWidth, this.inputHeight);
     this.markerDimensions = null;
     this.onUpdate = onUpdate;
@@ -124,7 +124,7 @@ class Controller {
 
     for (const buffer of buffers) {
       const compiler = new Compiler();
-      const dataList = compiler.importData(buffer);
+      const { dataList } = compiler.importData(buffer);
 
       for (const item of dataList) {
         allMatchingData.push(item.matchingData);

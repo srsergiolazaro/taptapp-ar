@@ -29,7 +29,7 @@ describe('End-to-End Detection (Protocol V5.1)', () => {
         // 2. Export and Import data (simulating network/storage)
         console.log('📂 Exporting and importing .mind data...');
         const exportedBuffer = compiler.exportData();
-        const importedData = compiler.importData(exportedBuffer);
+        const { dataList: importedData } = compiler.importData(exportedBuffer);
 
         expect(importedData.length).toBe(1);
         const matchingData = importedData[0].matchingData;

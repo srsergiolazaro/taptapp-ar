@@ -25,7 +25,7 @@ describe('Matcher with Columnar Data', () => {
         }];
         await compiler.compileImageTargets(targetImages, () => { });
         const mindBuffer = compiler.exportData();
-        const importedData = compiler.importData(mindBuffer);
+        const { dataList: importedData } = compiler.importData(mindBuffer);
         const matchingData = importedData[0].matchingData;
 
         const greyData = new Uint8Array(imgWidth * imgHeight);

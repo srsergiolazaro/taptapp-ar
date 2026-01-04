@@ -384,8 +384,9 @@ export class OfflineCompiler {
   importData(buffer) {
     const content = msgpack.decode(new Uint8Array(buffer));
 
-    if (!content.v || content.v !== CURRENT_VERSION) {
-      console.error("Incompatible .mind version. Required: " + CURRENT_VERSION);
+    const version = content.v || 0;
+    if (version !== CURRENT_VERSION) {
+      console.error(`Incompatible .mind version: ${version}. This engine only supports Protocol V${CURRENT_VERSION}.`);
       return [];
     }
 
@@ -468,7 +469,7 @@ export class OfflineCompiler {
     }
 
     this.data = dataList;
-    return this.data;
+    return { version, dataList };
   }
 
   _unpackKeyframe(kf) {
@@ -486,13 +487,15 @@ export class OfflineCompiler {
   _decolumnarize(col, width, height) {
     const points = [];
     const count = col.x.length;
+    const descSize = 4;
+
     for (let i = 0; i < count; i++) {
       points.push({
         x: (col.x[i] / 65535) * width,
         y: (col.y[i] / 65535) * height,
         angle: col.a[i],
         scale: col.s ? col.s[i] : 1.0,
-        descriptors: col.d.slice(i * 4, (i + 1) * 4),
+        descriptors: col.d.slice(i * descSize, (i + 1) * descSize),
       });
     }
     return points;

@@ -11,7 +11,7 @@ class CropDetector {
     let cropSize = Math.pow(2, Math.round(Math.log(minDimension) / Math.log(2)));
     this.cropSize = cropSize;
 
-    this.detector = new DetectorLite(cropSize, cropSize);
+    this.detector = new DetectorLite(cropSize, cropSize, { useLSH: true });
 
     this.lastRandomIndex = 4;
   }
