@@ -260,9 +260,9 @@ export class OfflineCompiler {
     const dataList = this.data.map((item) => {
       const matchingData = item.matchingData.map((kf) => this._packKeyframe(kf));
 
-      const trackingData = [item.trackingData[0]].map((td) => {
+      const trackingData = item.trackingData.map((td) => {
         const count = td.points.length;
-        // Step 1: Packed Coords - Normalize width/height to 16-bit
+        // Packed Coords - Float32 for now as in current import logic
         const px = new Float32Array(count);
         const py = new Float32Array(count);
         for (let i = 0; i < count; i++) {

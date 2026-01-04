@@ -222,71 +222,70 @@ class SimpleAR {
         // 3. Get intrinsic projection from controller
         const proj = this.controller.projectionTransform;
 
-        // 4. Position calculation via matrix3d (Support for 3D tilt/Z-rotation)
-        // We convert the OpenGL World Matrix to a CSS matrix3d.
-        // The OpenGL matrix is column-major. CSS matrix3d is also column-major.
-        const m = this.controller.getWorldMatrix(mVT, targetIndex);
-
-        // Map OpenGL coords to Screen Pixels using the projection logic
-        const vW = needsRotation ? videoH : videoW;
-        const vH = needsRotation ? videoW : videoH;
-        const perspectiveScale = Math.max(containerRect.width / vW, containerRect.height / vH);
-        const displayW = vW * perspectiveScale;
-        const displayH = vH * perspectiveScale;
-        const offsetX = (containerRect.width - displayW) / 2;
-        const offsetY = (containerRect.height - displayH) / 2;
-
-        // Adjust for centered marker and scaleMultiplier
-        const s = finalScale; // We still need the base scale factor for the pixel-to-marker mapping
-        // However, a cleaner way is to use the world matrix directly and map it.
-
-        // Actually, the simpler way to do 3D in CSS while keeping my projection logic is:
-        // Project the 4 corners and find the homography, OR
-        // Use the OpenGL matrix directly with a perspective mapping.
-
-        // Let's use the points projection to maintain the "needsRotation" logic compatibility
-        const pMid = projectToScreen(markerW / 2, markerH / 2, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
+        // 3. Project 4 corners to determine a full 3D perspective (homography)
         const pUL = projectToScreen(0, 0, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
         const pUR = projectToScreen(markerW, 0, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
         const pLL = projectToScreen(0, markerH, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
+        const pLR = projectToScreen(markerW, markerH, 0, mVT, proj, videoW, videoH, containerRect, needsRotation);
 
-        // Using these points we can calculate the 3D rotation and perspective
-        const dx = pUR.sx - pUL.sx;
-        const dy = pUR.sy - pUL.sy;
-        const dz = pUR.sx - pLL.sx; // Not really Z but used for slant
+        // Helper to solve for 2D Homography (maps 0..1 square to pUL, pUR, pLL, pLR)
+        const solveHomography = (w, h, p1, p2, p3, p4) => {
+            const x1 = p1.sx, y1 = p1.sy;
+            const x2 = p2.sx, y2 = p2.sy;
+            const x3 = p3.sx, y3 = p3.sy;
+            const x4 = p4.sx, y4 = p4.sy;
 
-        const angle = Math.atan2(dy, dx);
-        const scaleX = Math.sqrt(dx * dx + dy * dy) / markerW;
-        const scaleY = Math.sqrt((pLL.sx - pUL.sx) ** 2 + (pLL.sy - pUL.sy) ** 2) / markerH;
+            const dx1 = x2 - x4, dx2 = x3 - x4, dx3 = x1 - x2 + x4 - x3;
+            const dy1 = y2 - y4, dy2 = y3 - y4, dy3 = y1 - y2 + y4 - y3;
 
-        // For true 3D tilt, we'll use the projection of the axes
-        const screenX = pMid.sx;
-        const screenY = pMid.sy;
+            let a, b, c, d, e, f, g, h_coeff;
 
-        // Final Transform applying 3D perspective via matrix3d derived from projected points
-        // NOTE: For full 3D we'd need a homography solver, but for "tilt" we can use the 
-        // original modelViewTransform if we convert it carefully.
+            if (dx3 === 0 && dy3 === 0) {
+                a = x2 - x1; b = x3 - x1; c = x1;
+                d = y2 - y1; e = y3 - y1; f = y1;
+                g = 0; h_coeff = 0;
+            } else {
+                const det = dx1 * dy2 - dx2 * dy1;
+                g = (dx3 * dy2 - dx2 * dy3) / det;
+                h_coeff = (dx1 * dy3 - dx3 * dy1) / det;
+                a = x2 - x1 + g * x2;
+                b = x3 - x1 + h_coeff * x3;
+                c = x1;
+                d = y2 - y1 + g * y2;
+                e = y3 - y1 + h_coeff * y3;
+                f = y1;
+            }
+            // This maps unit square (0..1) to the quadrilateral.
+            // We need to scale it by 1/w and 1/h to map (0..w, 0..h)
+            return [
+                a / w, d / w, 0, g / w,
+                b / h, e / h, 0, h_coeff / h,
+                0, 0, 1, 0,
+                c, f, 0, 1
+            ];
+        };
 
-        const openGLWorldMatrix = this.controller.getWorldMatrix(mVT, targetIndex);
-        // We need to apply the same scaling and offsets as projectToScreen to the matrix
+        const matrix = solveHomography(markerW, markerH, pUL, pUR, pLL, pLR);
 
+        // Apply styles
         this.overlay.style.maxWidth = 'none';
         this.overlay.style.width = `${markerW}px`;
         this.overlay.style.height = `${markerH}px`;
         this.overlay.style.position = 'absolute';
-        this.overlay.style.transformOrigin = '0 0'; // Top-left based for simpler matrix mapping
+        this.overlay.style.transformOrigin = '0 0';
         this.overlay.style.left = '0';
         this.overlay.style.top = '0';
         this.overlay.style.display = 'block';
 
-        // Approximate 3D tilt using the projected corners to calculate a skew/scale/rotate combo
-        // This is more robust than a raw matrix3d if the projection isn't a perfect pinhole
+        // Apply 3D transform with matrix3d
+        // We also apply the user's custom scaleMultiplier AFTER the perspective transform
+        // but since we want to scale around the marker center, we apply it as a prefix/suffix
+        // Scale around top-left (0,0) is easy. Scale around center requires offset.
         this.overlay.style.transform = `
-            translate(${pUL.sx}px, ${pUL.sy}px)
-            matrix(${(pUR.sx - pUL.sx) / markerW}, ${(pUR.sy - pUL.sy) / markerW}, 
-                   ${(pLL.sx - pUL.sx) / markerH}, ${(pLL.sy - pUL.sy) / markerH}, 
-                   0, 0)
+            matrix3d(${matrix.join(',')})
+            translate(${markerW / 2}px, ${markerH / 2}px)
             scale(${this.scaleMultiplier})
+            translate(${-markerW / 2}px, ${-markerH / 2}px)
         `;
     }
 

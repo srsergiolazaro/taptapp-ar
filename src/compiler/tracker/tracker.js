@@ -24,16 +24,13 @@ class Tracker {
     this.inputHeight = inputHeight;
     this.debugMode = debugMode;
 
-    this.trackingKeyframeList = [];
-    for (let i = 0; i < trackingDataList.length; i++) {
-      this.trackingKeyframeList.push(trackingDataList[i][TRACKING_KEYFRAME]);
-    }
+    this.trackingKeyframeList = []; // All octaves for all targets: [targetIndex][octaveIndex]
+    this.prebuiltData = []; // [targetIndex][octaveIndex]
 
-    // Prebuild TypedArrays for features and pixels
-    this.prebuiltData = [];
-    for (let i = 0; i < this.trackingKeyframeList.length; i++) {
-      const keyframe = this.trackingKeyframeList[i];
-      this.prebuiltData[i] = {
+    for (let i = 0; i < trackingDataList.length; i++) {
+      const targetOctaves = trackingDataList[i];
+      this.trackingKeyframeList[i] = targetOctaves;
+      this.prebuiltData[i] = targetOctaves.map(keyframe => ({
         px: new Float32Array(keyframe.px),
         py: new Float32Array(keyframe.py),
         data: new Uint8Array(keyframe.d),
@@ -42,7 +39,7 @@ class Tracker {
         scale: keyframe.s,
         // Recyclable projected image buffer
         projectedImage: new Float32Array(keyframe.w * keyframe.h)
-      };
+      }));
     }
 
     // Pre-allocate template data buffer to avoid garbage collection
@@ -65,12 +62,31 @@ class Tracker {
   track(inputData, lastModelViewTransform, targetIndex) {
     let debugExtra = {};
 
+    // Select the best octave based on current estimated distance/scale
+    // We want the octave where the marker size is closest to its projected size on screen
     const modelViewProjectionTransform = buildModelViewProjectionTransform(
       this.projectionTransform,
       lastModelViewTransform,
     );
 
-    const prebuilt = this.prebuiltData[targetIndex];
+    // Estimate current marker width on screen
+    const [mW, mH] = this.markerDimensions[targetIndex];
+    const p0 = computeScreenCoordiate(modelViewProjectionTransform, 0, 0);
+    const p1 = computeScreenCoordiate(modelViewProjectionTransform, mW, 0);
+    const screenW = Math.sqrt((p1.x - p0.x) ** 2 + (p1.y - p0.y) ** 2);
+
+    // Select octave whose image width is closest to screenW
+    let octaveIndex = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < this.prebuiltData[targetIndex].length; i++) {
+      const diff = Math.abs(this.prebuiltData[targetIndex][i].width - screenW);
+      if (diff < minDiff) {
+        minDiff = diff;
+        octaveIndex = i;
+      }
+    }
+
+    const prebuilt = this.prebuiltData[targetIndex][octaveIndex];
 
     // 1. Compute Projection (Warping)
     this._computeProjection(
@@ -87,7 +103,7 @@ class Tracker {
       projectedImage
     );
 
-    const trackingFrame = this.trackingKeyframeList[targetIndex];
+    const trackingFrame = this.trackingKeyframeList[targetIndex][octaveIndex];
     const worldCoords = [];
     const screenCoords = [];
     const goodTrack = [];
@@ -113,6 +129,7 @@ class Tracker {
 
     if (this.debugMode) {
       debugExtra = {
+        octaveIndex,
         projectedImage: Array.from(projectedImage),
         matchingPoints,
         goodTrack,
