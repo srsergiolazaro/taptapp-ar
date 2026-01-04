@@ -47,6 +47,11 @@ async function generate() {
 
     console.log(`🚀 Loading base image: ${TEST_IMAGE_PATH}`);
     const baseImage = await Jimp.read(TEST_IMAGE_PATH);
+    const originalWidth = baseImage.bitmap.width;
+    const originalHeight = baseImage.bitmap.height;
+
+    // Metadata structure for all test cases
+    const allMetadata = {};
 
     for (const res of RESOLUTIONS) {
         const resDir = path.join(OUTPUT_BASE_DIR, res.name);
@@ -55,108 +60,173 @@ async function generate() {
         }
         console.log(`📁 Generating images for ${res.name} (${res.width}x${res.height})...`);
 
-        // 1. POSITIONS (Normal Scale, 0 rotation)
-        const posWork = async (name, x, y, img = baseImage) => {
+        const resMetadata = {};
+
+        /**
+         * Creates a test image and records metadata
+         * @param {string} name - Test case name
+         * @param {string} position - 'center', 'top', 'bottom', 'left', 'right', 'corner_tl', etc.
+         * @param {number} scale - Scale factor (1.0 = original)
+         * @param {number} rotZ - Rotation around Z axis (degrees)
+         * @param {number} rotX - Rotation around X axis (perspective tilt, degrees)
+         * @param {number} rotY - Rotation around Y axis (perspective tilt, degrees)
+         * @param {Jimp} sourceImg - Image to use (can be pre-transformed)
+         */
+        const createTestCase = async (name, position, scale, rotZ, rotX, rotY, sourceImg = baseImage) => {
             const canvas = new Jimp({ width: res.width, height: res.height, color: 0xFFFFFFFF });
 
-            let scaledImg = img.clone();
+            let transformedImg = sourceImg.clone();
             const maxW = res.width - MARGIN * 2;
             const maxH = res.height - MARGIN * 2;
 
-            // Critical: Ensure it fits AFTER any rotation/scaling
-            if (scaledImg.bitmap.width > maxW || scaledImg.bitmap.height > maxH) {
-                scaledImg.scaleToFit({ w: maxW, h: maxH });
+            // Ensure it fits
+            if (transformedImg.bitmap.width > maxW || transformedImg.bitmap.height > maxH) {
+                transformedImg.scaleToFit({ w: maxW, h: maxH });
             }
 
-            // Re-calculate x, y for centered/aligned positions based on scaled image
-            const sw = scaledImg.bitmap.width;
-            const sh = scaledImg.bitmap.height;
+            const imgW = transformedImg.bitmap.width;
+            const imgH = transformedImg.bitmap.height;
 
-            let finalX = x;
-            let finalY = y;
-
-            if (name === 'center') {
-                finalX = (res.width - sw) / 2;
-                finalY = (res.height - sh) / 2;
-            } else if (name === 'top') {
-                finalX = (res.width - sw) / 2;
-                finalY = MARGIN;
-            } else if (name === 'bottom') {
-                finalX = (res.width - sw) / 2;
-                finalY = res.height - sh - MARGIN;
-            } else if (name === 'left') {
-                finalX = MARGIN;
-                finalY = (res.height - sh) / 2;
-            } else if (name === 'right') {
-                finalX = res.width - sw - MARGIN;
-                finalY = (res.height - sh) / 2;
-            } else if (name === 'corner_tl') {
-                finalX = MARGIN;
-                finalY = MARGIN;
-            } else if (name === 'corner_tr') {
-                finalX = res.width - sw - MARGIN;
-                finalY = MARGIN;
-            } else if (name === 'corner_bl') {
-                finalX = MARGIN;
-                finalY = res.height - sh - MARGIN;
-            } else if (name === 'corner_br') {
-                finalX = res.width - sw - MARGIN;
-                finalY = res.height - sh - MARGIN;
+            // Calculate position
+            let finalX, finalY;
+            switch (position) {
+                case 'center':
+                    finalX = (res.width - imgW) / 2;
+                    finalY = (res.height - imgH) / 2;
+                    break;
+                case 'top':
+                    finalX = (res.width - imgW) / 2;
+                    finalY = MARGIN;
+                    break;
+                case 'bottom':
+                    finalX = (res.width - imgW) / 2;
+                    finalY = res.height - imgH - MARGIN;
+                    break;
+                case 'left':
+                    finalX = MARGIN;
+                    finalY = (res.height - imgH) / 2;
+                    break;
+                case 'right':
+                    finalX = res.width - imgW - MARGIN;
+                    finalY = (res.height - imgH) / 2;
+                    break;
+                case 'corner_tl':
+                    finalX = MARGIN;
+                    finalY = MARGIN;
+                    break;
+                case 'corner_tr':
+                    finalX = res.width - imgW - MARGIN;
+                    finalY = MARGIN;
+                    break;
+                case 'corner_bl':
+                    finalX = MARGIN;
+                    finalY = res.height - imgH - MARGIN;
+                    break;
+                case 'corner_br':
+                    finalX = res.width - imgW - MARGIN;
+                    finalY = res.height - imgH - MARGIN;
+                    break;
+                default:
+                    finalX = (res.width - imgW) / 2;
+                    finalY = (res.height - imgH) / 2;
             }
 
-            if (finalX === null || finalY === null) {
-                finalX = (res.width - sw) / 2;
-                finalY = (res.height - sh) / 2;
-            }
-
-            canvas.composite(scaledImg, finalX, finalY);
+            canvas.composite(transformedImg, Math.round(finalX), Math.round(finalY));
             await canvas.write(path.join(resDir, `${name}.png`));
+
+            // Calculate actual scale relative to original
+            const actualScale = imgW / originalWidth;
+
+            // Expected center position in screen coordinates
+            const expectedCenterX = Math.round(finalX + imgW / 2);
+            const expectedCenterY = Math.round(finalY + imgH / 2);
+
+            // Store metadata
+            resMetadata[`${name}.png`] = {
+                position: position,
+                expectedCenter: {
+                    x: expectedCenterX,
+                    y: expectedCenterY,
+                },
+                expectedScale: actualScale,
+                expectedRotation: {
+                    z: rotZ, // degrees
+                    x: rotX, // degrees (perspective tilt forward/back)
+                    y: rotY, // degrees (perspective tilt left/right)
+                },
+                imageSize: {
+                    width: imgW,
+                    height: imgH,
+                },
+                bounds: {
+                    left: Math.round(finalX),
+                    top: Math.round(finalY),
+                    right: Math.round(finalX + imgW),
+                    bottom: Math.round(finalY + imgH),
+                },
+            };
         };
 
-        await posWork('center');
-        await posWork('top');
-        await posWork('bottom');
-        await posWork('left');
-        await posWork('right');
-        await posWork('corner_tl');
-        await posWork('corner_tr');
-        await posWork('corner_bl');
-        await posWork('corner_br');
+        // 1. POSITIONS (Normal Scale, 0 rotation)
+        await createTestCase('center', 'center', 1.0, 0, 0, 0);
+        await createTestCase('top', 'top', 1.0, 0, 0, 0);
+        await createTestCase('bottom', 'bottom', 1.0, 0, 0, 0);
+        await createTestCase('left', 'left', 1.0, 0, 0, 0);
+        await createTestCase('right', 'right', 1.0, 0, 0, 0);
+        await createTestCase('corner_tl', 'corner_tl', 1.0, 0, 0, 0);
+        await createTestCase('corner_tr', 'corner_tr', 1.0, 0, 0, 0);
+        await createTestCase('corner_bl', 'corner_bl', 1.0, 0, 0, 0);
+        await createTestCase('corner_br', 'corner_br', 1.0, 0, 0, 0);
 
         // 2. ROTATIONS Z (Centered, Normal Scale)
         const rotationsZ = [15, -15, 30, -30, 45, -45];
         for (const deg of rotationsZ) {
             const rotated = baseImage.clone().rotate(deg);
-            await posWork(`rot_z_${deg}`, null, null, rotated);
+            await createTestCase(`rot_z_${deg}`, 'center', 1.0, deg, 0, 0, rotated);
         }
 
-        // 3. ROTATIONS X (Tilt) - Simulated by vertical squeeze + trapezoid
+        // 3. ROTATIONS X (Tilt forward/back) - Simulated by vertical squeeze
         const rotationsX = [15, -15, 30, -30];
         for (const deg of rotationsX) {
             const rad = deg * Math.PI / 180;
             const scaleY = Math.abs(Math.cos(rad));
-            const tilted = baseImage.clone().resize({ w: baseImage.bitmap.width, h: Math.round(baseImage.bitmap.height * scaleY) });
-            // Perspective approximation: squeeze top or bottom
-            // (For now, just the squeeze is a good first step, real perspective warp is harder with Jimp only)
-            await posWork(`rot_x_${deg}`, null, null, tilted);
+            const tilted = baseImage.clone().resize({
+                w: baseImage.bitmap.width,
+                h: Math.round(baseImage.bitmap.height * scaleY)
+            });
+            await createTestCase(`rot_x_${deg}`, 'center', 1.0, 0, deg, 0, tilted);
         }
 
-        // 4. ROTATIONS Y (Tilt) - Simulated by horizontal squeeze
+        // 4. ROTATIONS Y (Tilt left/right) - Simulated by horizontal squeeze
         const rotationsY = [15, -15, 30, -30];
         for (const deg of rotationsY) {
             const rad = deg * Math.PI / 180;
             const scaleX = Math.abs(Math.cos(rad));
-            const tilted = baseImage.clone().resize({ w: Math.round(baseImage.bitmap.width * scaleX), h: baseImage.bitmap.height });
-            await posWork(`rot_y_${deg}`, null, null, tilted);
+            const tilted = baseImage.clone().resize({
+                w: Math.round(baseImage.bitmap.width * scaleX),
+                h: baseImage.bitmap.height
+            });
+            await createTestCase(`rot_y_${deg}`, 'center', 1.0, 0, 0, deg, tilted);
         }
 
         // 5. SCALES (Centered, 0 rotation)
-        const scales = [0.5, 0.75, 1.25, 1.5]; // 1.0 is center.png
+        const scales = [0.5, 0.75, 1.25, 1.5];
         for (const s of scales) {
             const scaled = baseImage.clone().scale(s);
-            await posWork(`scale_${Math.round(s * 100)}`, null, null, scaled);
+            await createTestCase(`scale_${Math.round(s * 100)}`, 'center', s, 0, 0, 0, scaled);
         }
+
+        allMetadata[res.name] = {
+            resolution: { width: res.width, height: res.height },
+            originalImage: { width: originalWidth, height: originalHeight },
+            testCases: resMetadata,
+        };
     }
+
+    // Write metadata JSON
+    const metadataPath = path.join(OUTPUT_BASE_DIR, 'metadata.json');
+    fs.writeFileSync(metadataPath, JSON.stringify(allMetadata, null, 2));
+    console.log(`📄 Metadata saved to ${metadataPath}`);
 
     console.log('✅ All images generated successfully!');
 }

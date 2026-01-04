@@ -12,7 +12,7 @@
 
 import { Controller } from '../src/compiler/controller.js';
 import { OfflineCompiler } from '../src/compiler/offline-compiler.js';
-import { projectToScreen } from '../src/compiler/utils/projection.js';
+
 import { Jimp } from 'jimp';
 import path from 'path';
 import fs from 'fs';
@@ -37,6 +37,14 @@ const CONFIG = {
 
 async function runCheck() {
     console.log('\x1b[1m\x1b[35m%s\x1b[0m', '🧪 COMPILER STRESS TEST (Adaptive Sampling)');
+
+    // 0. Load Metadata
+    const metadataPath = path.join(ROBUSTNESS_DIR, 'metadata.json');
+    if (!fs.existsSync(metadataPath)) {
+        console.error('❌ Metadata file not found. Run generate-robustness-images.js first.');
+        process.exit(1);
+    }
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
 
     // 1. Compile Target
     const baseImage = await Jimp.read(TEST_IMAGE_PATH);
@@ -71,6 +79,8 @@ async function runCheck() {
 
         for (const res of folders) {
             const resPath = path.join(ROBUSTNESS_DIR, res);
+            const resMetadata = metadata[res];
+
             let files = fs.readdirSync(resPath).filter(f => f.endsWith('.png'));
 
             // Sampling logic
@@ -108,17 +118,58 @@ async function runCheck() {
                 stats.totalDetectTime += detectTime;
                 stats.totalMatchTime += matchTime;
 
+                // Validation Logic
+                const meta = resMetadata?.testCases?.[file];
+                let isWarning = false;
+                let failReason = null;
+                let errors = [];
+
                 if (matchResult.targetIndex === -1) {
-                    stats.failed++;
-                    console.log(`\x1b[31m   ❌ FAILED: [${res}] ${file} (Det: ${detectTime}ms, Match: ${matchTime}ms)\x1b[0m`);
+                    failReason = "No match found";
                 } else {
                     const inliers = matchResult.screenCoords?.length || 0;
                     if (inliers < CONFIG.MIN_INLIERS) {
-                        stats.warnings++;
-                        console.log(`\x1b[33m   ⚠️ WARNING: [${res}] ${file} (Inliers: ${inliers}, Det: ${detectTime}ms, Match: ${matchTime}ms)\x1b[0m`);
-                    } else {
-                        stats.passed++;
+                        isWarning = true;
+                        errors.push(`Inliers: ${inliers}`);
                     }
+
+                    // Geometric Validation
+                    if (meta && matchResult.modelViewTransform) {
+                        const P = controller.projectionTransform;
+                        const M = matchResult.modelViewTransform;
+
+                        const cx = resMetadata.originalImage.width / 2;
+                        const cy = resMetadata.originalImage.height / 2;
+                        const z = 0;
+
+                        // 1. Marker to Camera
+                        const tx = M[0][0] * cx + M[0][1] * cy + M[0][2] * z + M[0][3];
+                        const ty = M[1][0] * cx + M[1][1] * cy + M[1][2] * z + M[1][3];
+                        const tz = M[2][0] * cx + M[2][1] * cy + M[2][2] * z + M[2][3];
+
+                        // 2. Camera to Image (Buffer Pixels)
+                        const imageX = (P[0][0] * tx / tz) + P[0][2];
+                        const imageY = (P[1][1] * ty / tz) + P[1][2];
+
+                        const dist = Math.sqrt(Math.pow(imageX - meta.expectedCenter.x, 2) + Math.pow(imageY - meta.expectedCenter.y, 2));
+
+                        const threshold = Math.min(controller.inputWidth, controller.inputHeight) * 0.15;
+
+                        if (dist > threshold) {
+                            isWarning = true;
+                            errors.push(`Drift: ${dist.toFixed(1)}px`);
+                        }
+                    }
+                }
+
+                if (failReason) {
+                    stats.failed++;
+                    console.log(`\x1b[31m   ❌ FAILED: [${res}] ${file} - ${failReason} (Det: ${detectTime}ms, Match: ${matchTime}ms)\x1b[0m`);
+                } else if (isWarning) {
+                    stats.warnings++;
+                    console.log(`\x1b[33m   ⚠️ WARNING: [${res}] ${file} (${errors.join(', ')}, Det: ${detectTime}ms, Match: ${matchTime}ms)\x1b[0m`);
+                } else {
+                    stats.passed++;
                 }
             }
         }

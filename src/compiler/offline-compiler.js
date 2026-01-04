@@ -263,11 +263,11 @@ export class OfflineCompiler {
       const trackingData = [item.trackingData[0]].map((td) => {
         const count = td.points.length;
         // Step 1: Packed Coords - Normalize width/height to 16-bit
-        const px = new Uint16Array(count);
-        const py = new Uint16Array(count);
+        const px = new Float32Array(count);
+        const py = new Float32Array(count);
         for (let i = 0; i < count; i++) {
-          px[i] = Math.round((td.points[i].x / td.width) * 65535);
-          py[i] = Math.round((td.points[i].y / td.height) * 65535);
+          px[i] = td.points[i].x;
+          py[i] = td.points[i].y;
         }
         return {
           w: td.width,
@@ -396,23 +396,14 @@ export class OfflineCompiler {
 
       // Unpack Tracking Data
       for (const td of item.trackingData) {
-        let pxRaw = td.px;
-        let pyRaw = td.py;
+        let px = td.px;
+        let py = td.py;
 
-        if (pxRaw instanceof Uint8Array) {
-          pxRaw = new Uint16Array(pxRaw.buffer.slice(pxRaw.byteOffset, pxRaw.byteOffset + pxRaw.byteLength));
+        if (px instanceof Uint8Array) {
+          px = new Float32Array(px.buffer.slice(px.byteOffset, px.byteOffset + px.byteLength));
         }
-        if (pyRaw instanceof Uint8Array) {
-          pyRaw = new Uint16Array(pyRaw.buffer.slice(pyRaw.byteOffset, pyRaw.byteOffset + pyRaw.byteLength));
-        }
-
-        // Rescale for compatibility with Tracker
-        const count = pxRaw.length;
-        const px = new Float32Array(count);
-        const py = new Float32Array(count);
-        for (let k = 0; k < count; k++) {
-          px[k] = (pxRaw[k] / 65535) * td.w;
-          py[k] = (pyRaw[k] / 65535) * td.h;
+        if (py instanceof Uint8Array) {
+          py = new Float32Array(py.buffer.slice(py.byteOffset, py.byteOffset + py.byteLength));
         }
         td.px = px;
         td.py = py;
