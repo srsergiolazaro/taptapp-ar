@@ -1,77 +1,142 @@
-import React, { useMemo } from "react";
-import { useAR } from "./use-ar.js";
+import { useEffect, useRef, useState } from "react";
 import type { ARConfig } from "./types.js";
 
-export interface TaptappARProps {
+interface ARViewerProps {
     config: ARConfig;
-    className?: string;
-    showScanningOverlay?: boolean;
-    showErrorOverlay?: boolean;
 }
 
-export const TaptappAR: React.FC<TaptappARProps> = ({
-    config,
-    className = "",
-    showScanningOverlay = true,
-    showErrorOverlay = true
-}) => {
-    const { containerRef, overlayRef, status, toggleVideo } = useAR(config);
+export const ARViewer: React.FC<ARViewerProps> = ({ config }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const overlayRef = useRef<HTMLVideoElement | HTMLImageElement>(null);
+    const [status, setStatus] = useState<"scanning" | "tracking" | "error">("scanning");
+    const [isPlaying, setIsPlaying] = useState(false);
+    const arInstanceRef = useRef<any>(null);
 
-    // Simple heuristic to determine if it's a video or image
-    // based on the presence of videoSrc and common extensions
-    const isVideo = useMemo(() => {
-        if (!config.videoSrc) return false;
-        const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
-        const url = config.videoSrc.toLowerCase().split('?')[0];
-        return videoExtensions.some(ext => url.endsWith(ext)) || config.videoSrc.includes('video');
-    }, [config.videoSrc]);
+    useEffect(() => {
+        let isMounted = true;
+
+        const initAR = async () => {
+            if (!containerRef.current || !overlayRef.current) return;
+
+            try {
+                // @ts-ignore
+                window.AR_DEBUG = true;
+                const { SimpleAR } = await import("@srsergio/taptapp-ar");
+
+                const isVideo = config.overlayType === "video";
+
+                // Set initial overlay styles (SimpleAR will handle positioning)
+                const overlayEl = overlayRef.current;
+                overlayEl.style.opacity = "0";
+                overlayEl.style.transition = "opacity 0.3s ease";
+                overlayEl.style.pointerEvents = "none";
+                overlayEl.style.zIndex = "10";
+
+                const arInstance = new (SimpleAR as any)({
+                    container: containerRef.current,
+                    targetSrc: config.targetTaarSrc,
+                    overlay: overlayRef.current,
+                    scale: config.scale,
+                    onFound: async ({ targetIndex }: { targetIndex: number }) => {
+                        console.log(`🎯 Target ${targetIndex} detected!`);
+                        if (!isMounted) return;
+                        setStatus("tracking");
+
+                        if (isVideo && overlayRef.current) {
+                            try {
+                                await (overlayRef.current as HTMLVideoElement).play();
+                                setIsPlaying(true);
+                            } catch (err) {
+                                console.warn("Auto-play blocked:", err);
+                            }
+                        }
+                    },
+                    onLost: ({ targetIndex }: { targetIndex: number }) => {
+                        console.log(`👋 Target ${targetIndex} lost`);
+                        if (!isMounted) return;
+                        setStatus("scanning");
+
+                        if (isVideo && overlayRef.current) {
+                            (overlayRef.current as HTMLVideoElement).pause();
+                            setIsPlaying(false);
+                        }
+                    }
+                });
+
+                arInstanceRef.current = arInstance;
+                await arInstance.start();
+
+                if (isMounted) {
+                    setStatus("scanning");
+                }
+            } catch (err) {
+                console.error("Failed to initialize AR:", err);
+                if (isMounted) {
+                    setStatus("error");
+                }
+            }
+        };
+
+        initAR();
+
+        return () => {
+            isMounted = false;
+            if (arInstanceRef.current) {
+                arInstanceRef.current.stop();
+            }
+        };
+    }, [config]);
+
+    const handleClick = async () => {
+        if (config.overlayType !== "video" || !overlayRef.current) return;
+        const videoEl = overlayRef.current as HTMLVideoElement;
+
+        try {
+            if (isPlaying) {
+                videoEl.pause();
+                setIsPlaying(false);
+            } else {
+                await videoEl.play();
+                setIsPlaying(true);
+            }
+        } catch (err) {
+            console.error("Error toggling video:", err);
+        }
+    };
 
     return (
-        <div className={`taptapp-ar-wrapper ${className} ${status}`} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+        <>
             {/* Scanning Overlay */}
-            {showScanningOverlay && status === "scanning" && (
-                <div className="taptapp-ar-overlay taptapp-ar-scanning">
-                    <div className="scanning-content">
-                        <div className="scanning-frame">
-                            <img
-                                className="target-preview"
-                                src={config.targetImageSrc}
-                                alt="Target"
-                                crossOrigin="anonymous"
-                            />
-                            <div className="scanning-line"></div>
-                        </div>
-                        <p className="scanning-text">Apunta a la imagen para comenzar</p>
-                    </div>
+            <div className={`overlay-ui scanning-overlay ${status !== "scanning" ? "hidden" : "visible"}`}>
+                <div className="scanning-frame">
+                    <img
+                        className="target-preview"
+                        src={config.targetImageSrc}
+                        alt="Apunta aquí"
+                        crossOrigin="anonymous"
+                        loading="eager"
+                        // @ts-ignore
+                        fetchpriority="high"
+                    />
                 </div>
-            )}
+                <p className="overlay-text">Apunta a la imagen para comenzar</p>
+            </div>
 
             {/* Error Overlay */}
-            {showErrorOverlay && status === "error" && (
-                <div className="taptapp-ar-overlay taptapp-ar-error">
-                    <div className="error-content">
-                        <span className="error-icon">⚠️</span>
-                        <p className="error-title">No se pudo iniciar AR</p>
-                        <p className="error-text">Verifica los permisos de cámara</p>
-                        <button className="retry-btn" onClick={() => window.location.reload()}>
-                            Reintentar
-                        </button>
-                    </div>
-                </div>
-            )}
+            <div className={`overlay-ui error-overlay ${status !== "error" ? "hidden" : "visible"}`}>
+                <span className="error-icon">⚠️</span>
+                <p className="overlay-text">No se pudo iniciar la experiencia AR</p>
+                <p className="overlay-subtext">Verifica los permisos de cámara e intenta nuevamente</p>
+                <button className="retry-btn" onClick={() => window.location.reload()}>Reintentar</button>
+            </div>
 
             {/* AR Container */}
-            <div
-                ref={containerRef}
-                className="taptapp-ar-container"
-                onClick={toggleVideo}
-                style={{ width: '100%', height: '100%' }}
-            >
-                {isVideo ? (
+            <div ref={containerRef} className="ar-container" onClick={handleClick}>
+                {config.overlayType === "video" ? (
                     <video
                         ref={overlayRef as React.RefObject<HTMLVideoElement>}
-                        className="taptapp-ar-overlay-element"
-                        src={config.videoSrc}
+                        className="ar-overlay"
+                        src={config.overlaySrc}
                         preload="auto"
                         loop
                         playsInline
@@ -81,96 +146,16 @@ export const TaptappAR: React.FC<TaptappARProps> = ({
                 ) : (
                     <img
                         ref={overlayRef as React.RefObject<HTMLImageElement>}
-                        className="taptapp-ar-overlay-element"
-                        src={config.videoSrc || config.targetImageSrc}
+                        className="ar-overlay"
+                        src={config.overlaySrc}
                         crossOrigin="anonymous"
                         alt="AR Overlay"
+                        loading="eager"
+                        // @ts-ignore
+                        fetchpriority="high"
                     />
                 )}
             </div>
-
-            <style>{`
-                .taptapp-ar-wrapper {
-                    background: #000;
-                    color: white;
-                    font-family: system-ui, -apple-system, sans-serif;
-                }
-                .taptapp-ar-overlay {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    z-index: 20;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: rgba(0,0,0,0.7);
-                    backdrop-filter: blur(4px);
-                    transition: opacity 0.3s ease;
-                }
-                .scanning-content, .error-content {
-                    text-align: center;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    padding: 20px;
-                }
-                .scanning-frame {
-                    position: relative;
-                    width: 200px;
-                    height: 200px;
-                    border: 2px solid rgba(255,255,255,0.3);
-                    border-radius: 20px;
-                    overflow: hidden;
-                    margin-bottom: 20px;
-                }
-                .target-preview {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                    opacity: 0.6;
-                }
-                .scanning-line {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 2px;
-                    background: #00e5ff;
-                    box-shadow: 0 0 15px #00e5ff;
-                    animation: scan 2s linear infinite;
-                }
-                @keyframes scan {
-                    0% { top: 0; }
-                    50% { top: 100%; }
-                    100% { top: 0; }
-                }
-                .scanning-text {
-                    font-size: 1.1rem;
-                    font-weight: 500;
-                    letter-spacing: 0.5px;
-                }
-                .error-icon { font-size: 3rem; margin-bottom: 10px; }
-                .error-title { font-size: 1.2rem; font-weight: bold; margin: 0; }
-                .error-text { opacity: 0.8; margin: 5px 0 20px; }
-                .retry-btn {
-                    padding: 10px 25px;
-                    border-radius: 30px;
-                    border: none;
-                    background: #fff;
-                    color: #000;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: transform 0.2s;
-                }
-                .retry-btn:active { transform: scale(0.95); }
-                .taptapp-ar-overlay-element {
-                    display: block;
-                    width: 100%;
-                    height: auto;
-                }
-            `}</style>
-        </div>
+        </>
     );
 };
