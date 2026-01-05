@@ -226,7 +226,7 @@ class Controller {
     return { targetIndex: matchedTargetIndex, modelViewTransform };
   }
   async _trackAndUpdate(inputData, lastModelViewTransform, targetIndex) {
-    const { worldCoords, screenCoords } = this.tracker.track(
+    const { worldCoords, screenCoords, debugExtra } = this.tracker.track(
       inputData,
       lastModelViewTransform,
       targetIndex,
@@ -236,7 +236,11 @@ class Controller {
       worldCoords,
       screenCoords,
     });
-    return modelViewTransform;
+    return {
+      modelViewTransform,
+      inliers: worldCoords.length,
+      octaveIndex: debugExtra.octaveIndex
+    };
   }
 
   processVideo(input) {
@@ -252,6 +256,7 @@ class Controller {
         currentModelViewTransform: null,
         trackCount: 0,
         trackMiss: 0,
+        stabilityCount: 0, // Nuevo: Contador para Live Adaptation
         filter: new OneEuroFilter({ minCutOff: this.filterMinCF, beta: this.filterBeta }),
       });
     }
@@ -291,15 +296,30 @@ class Controller {
           const trackingState = this.trackingStates[i];
 
           if (trackingState.isTracking) {
-            let modelViewTransform = await this._trackAndUpdate(
+            let result = await this._trackAndUpdate(
               inputData,
               trackingState.currentModelViewTransform,
               i,
             );
-            if (modelViewTransform === null) {
+            if (result === null) {
               trackingState.isTracking = false;
+              trackingState.stabilityCount = 0;
             } else {
-              trackingState.currentModelViewTransform = modelViewTransform;
+              trackingState.currentModelViewTransform = result.modelViewTransform;
+
+              // --- LIVE MODEL ADAPTATION LOGIC ---
+              // Si el tracking es muy sólido (muchos inliers) y estable, refinamos el modelo
+              if (result.inliers > 25) {
+                trackingState.stabilityCount++;
+                if (trackingState.stabilityCount > 20) { // 20 frames de estabilidad absoluta
+                  this.tracker.applyLiveFeedback(i, result.octaveIndex, 0.1); // 10% de mezcla real
+                  if (this.debugMode) console.log(`✨ Live Reification: Target ${i} (Octave ${result.octaveIndex}) updated with real-world textures.`);
+                  trackingState.stabilityCount = 0; // Reset para la siguiente actualización
+                }
+              } else {
+                trackingState.stabilityCount = Math.max(0, trackingState.stabilityCount - 1);
+              }
+              // -----------------------------------
             }
           }
 

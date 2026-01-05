@@ -300,6 +300,28 @@ class Tracker {
       }
     }
   }
+
+  /**
+   * Refines the target data (Living Mind Map) using actual camera feedback
+   * @param {number} targetIndex 
+   * @param {number} octaveIndex 
+   * @param {number} alpha - Blending factor (e.g. 0.1 for 10% new data)
+   */
+  applyLiveFeedback(targetIndex, octaveIndex, alpha) {
+    const prebuilt = this.prebuiltData[targetIndex][octaveIndex];
+    if (!prebuilt || !prebuilt.projectedImage) return;
+
+    const markerPixels = prebuilt.data;
+    const projectedPixels = prebuilt.projectedImage;
+    const count = markerPixels.length;
+
+    // Blend the projected (camera-sourced) pixels into the marker reference data
+    // This allows the NCC matching to adapt to real-world lighting and print quality
+    for (let i = 0; i < count; i++) {
+      // Simple linear blend
+      markerPixels[i] = (1 - alpha) * markerPixels[i] + alpha * projectedPixels[i];
+    }
+  }
 }
 
 export { Tracker };
