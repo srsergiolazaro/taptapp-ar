@@ -65,5 +65,43 @@ describe('Compiler Performance Benchmark', () => {
             });
         });
 
+        // 🚀 Verification Step: Ensure the compiled data actually works!
+        console.log(`\n🔍 Verifying compiled data with Controller...`);
+        const { Controller } = await import('../src/compiler/controller.js');
+
+        const controller = new Controller({
+            inputWidth: width,
+            inputHeight: height,
+            debugMode: false
+        });
+
+        // Load the exported buffer
+        const loadResult = controller.addImageTargetsFromBuffer(exportedData);
+        expect(loadResult).toBeDefined();
+
+        // Prepare input for controller (it expects specific format or Uint8Array)
+        // validationData is already grayscale Uint8Array
+        const validationInput = grayscaleData;
+
+        // 1. Detect features
+        const { featurePoints } = await controller.detect(validationInput);
+        console.log(`   - Detected ${featurePoints.length} features in validation pass.`);
+        expect(featurePoints.length).toBeGreaterThan(0);
+
+        // 2. Match against loaded target
+        const { targetIndex, modelViewTransform } = await controller.match(featurePoints, 0);
+        console.log(`   - Match Result: TargetIndex=${targetIndex}`);
+
+        if (targetIndex !== -1) {
+            console.log(`   ✅ Target FOUND! Match successful.`);
+        } else {
+            console.log(`   ❌ Target NOT found. Verification failed.`);
+        }
+
+        expect(targetIndex).toBe(0);
+        expect(modelViewTransform).toBeDefined();
+
+        controller.dispose();
+
     }, 300000); // 5 minute timeout for safety
 });

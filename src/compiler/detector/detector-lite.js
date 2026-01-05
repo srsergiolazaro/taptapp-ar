@@ -14,12 +14,12 @@ import { FREAKPOINTS } from "./freak.js";
 import { gpuCompute } from "../utils/gpu-compute.js";
 import { computeLSH64, computeFullFREAK, packLSHIntoDescriptor } from "../utils/lsh-direct.js";
 
-const PYRAMID_MIN_SIZE = 4; // Reducido de 8 a 4 para exprimir al máximo la resolución
+const PYRAMID_MIN_SIZE = 4; // Restored to 4 for better small-scale detection
 // PYRAMID_MAX_OCTAVE ya no es necesario, el límite lo da PYRAMID_MIN_SIZE
 
 
 const NUM_BUCKETS_PER_DIMENSION = 10;
-const MAX_FEATURES_PER_BUCKET = 20; // 10x10x20 = 2000 max points total
+const MAX_FEATURES_PER_BUCKET = 15; // Increased from 5 to 15 to fix robustness regressions
 
 
 const ORIENTATION_NUM_BINS = 36;

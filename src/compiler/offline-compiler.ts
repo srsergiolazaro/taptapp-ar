@@ -18,7 +18,7 @@ const isNode = typeof process !== "undefined" &&
     process.versions != null &&
     process.versions.node != null;
 
-const CURRENT_VERSION = 6; // Protocol v6: Moonshot - LSH 64-bit
+const CURRENT_VERSION = 7; // Protocol v7: Moonshot - 4-bit Packed Tracking Data
 
 export class OfflineCompiler {
     data: any = null;
@@ -268,7 +268,8 @@ export class OfflineCompiler {
                         s: td.scale,
                         px,
                         py,
-                        d: td.data,
+
+                        d: this._pack4Bit(td.data),
                     };
                 }),
                 matchingData: item.matchingData.map((kf: any) => ({
@@ -368,6 +369,15 @@ export class OfflineCompiler {
                 }
                 td.px = px;
                 td.py = py;
+
+                // 🚀 MOONSHOT: Unpack 4-bit tracking data if detected
+                if (td.data && td.data.length === (td.width * td.height) / 2) {
+                    td.data = this._unpack4Bit(td.data, td.width, td.height);
+                }
+                // Also handle 'd' property if it exists (msgpack mapping)
+                if (td.d && td.d.length === (td.w * td.h) / 2) {
+                    td.d = this._unpack4Bit(td.d, td.w, td.h);
+                }
             }
 
             for (const kf of item.matchingData) {
@@ -469,5 +479,35 @@ export class OfflineCompiler {
         if (this.workerPool) {
             await this.workerPool.destroy();
         }
+    }
+
+
+    _pack4Bit(data: Uint8Array) {
+        const length = data.length;
+        if (length % 2 !== 0) return data; // Only pack even lengths
+
+        const packed = new Uint8Array(length / 2);
+        for (let i = 0; i < length; i += 2) {
+            // Take top 4 bits of each byte
+            const p1 = (data[i] & 0xF0) >> 4;
+            const p2 = (data[i + 1] & 0xF0) >> 4;
+            packed[i / 2] = (p1 << 4) | p2;
+        }
+        return packed;
+    }
+
+    _unpack4Bit(packed: Uint8Array, width: number, height: number) {
+        const length = width * height;
+        const data = new Uint8Array(length);
+
+        for (let i = 0; i < packed.length; i++) {
+            const byte = packed[i];
+            const p1 = (byte & 0xF0);      // First pixel (already in high position)
+            const p2 = (byte & 0x0F) << 4; // Second pixel (move to high position)
+
+            data[i * 2] = p1;
+            data[i * 2 + 1] = p2;
+        }
+        return data;
     }
 }
