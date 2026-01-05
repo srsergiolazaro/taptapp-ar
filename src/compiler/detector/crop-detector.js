@@ -33,28 +33,62 @@ class CropDetector {
   detectMoving(input) {
     const imageData = input;
 
-    // Expanded to 5x5 grid (25 positions) for better coverage
-    const gridSize = 5;
-    const dx = this.lastRandomIndex % gridSize;
-    const dy = Math.floor(this.lastRandomIndex / gridSize);
+    // 🚀 MOONSHOT: Alternate between local crops and GLOBAL scan
+    // This solves the "not reading the whole screen" issue.
+    // Every 3 frames, we do a full screen downsampled scan.
+    if (this.lastRandomIndex % 3 === 0) {
+      this.lastRandomIndex = (this.lastRandomIndex + 1) % 25;
+      return this._detectGlobal(imageData);
+    }
 
-    // Calculate offset from center, with overlap for better detection
+    // Original moving crop logic for high-detail local detection
+    const gridSize = 5;
+    const idx = (this.lastRandomIndex - 1) % (gridSize * gridSize);
+    const dx = idx % gridSize;
+    const dy = Math.floor(idx / gridSize);
+
     const stepX = this.cropSize / 3;
     const stepY = this.cropSize / 3;
 
     let startY = Math.floor(this.height / 2 - this.cropSize / 2 + (dy - 2) * stepY);
     let startX = Math.floor(this.width / 2 - this.cropSize / 2 + (dx - 2) * stepX);
 
-    // Clamp to valid bounds
-    if (startX < 0) startX = 0;
-    if (startY < 0) startY = 0;
-    if (startX >= this.width - this.cropSize) startX = this.width - this.cropSize - 1;
-    if (startY >= this.height - this.cropSize) startY = this.height - this.cropSize - 1;
+    startX = Math.max(0, Math.min(this.width - this.cropSize - 1, startX));
+    startY = Math.max(0, Math.min(this.height - this.cropSize - 1, startY));
 
-    this.lastRandomIndex = (this.lastRandomIndex + 1) % (gridSize * gridSize);
+    this.lastRandomIndex = (this.lastRandomIndex + 1) % 25;
 
-    const result = this._detect(imageData, startX, startY);
-    return result;
+    return this._detect(imageData, startX, startY);
+  }
+
+  /**
+   * Scans the ENTIRE frame by downsampling it to cropSize
+   */
+  _detectGlobal(imageData) {
+    const croppedData = new Float32Array(this.cropSize * this.cropSize);
+    const scaleX = this.width / this.cropSize;
+    const scaleY = this.height / this.cropSize;
+
+    // Fast downsample (nearest neighbor is enough for initial feature detection)
+    for (let y = 0; y < this.cropSize; y++) {
+      const srcY = Math.floor(y * scaleY) * this.width;
+      const dstY = y * this.cropSize;
+      for (let x = 0; x < this.cropSize; x++) {
+        croppedData[dstY + x] = imageData[srcY + Math.floor(x * scaleX)];
+      }
+    }
+
+    const { featurePoints } = this.detector.detect(croppedData);
+
+    featurePoints.forEach((p) => {
+      p.x *= scaleX;
+      p.y *= scaleY;
+    });
+
+    return {
+      featurePoints,
+      debugExtra: this.debugMode ? { projectedImage: Array.from(croppedData), isGlobal: true } : {}
+    };
   }
 
   _detect(imageData, startX, startY) {

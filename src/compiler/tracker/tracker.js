@@ -2,7 +2,7 @@ import { buildModelViewProjectionTransform, computeScreenCoordiate } from "../es
 
 const AR2_DEFAULT_TS = 6;
 const AR2_DEFAULT_TS_GAP = 1;
-const AR2_SEARCH_SIZE = 18;
+const AR2_SEARCH_SIZE = 34; // Increased from 18 to 34 for much better fast-motion tracking
 const AR2_SEARCH_GAP = 1;
 const AR2_SIM_THRESH = 0.6;
 
