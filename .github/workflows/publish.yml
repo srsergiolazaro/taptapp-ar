@@ -31,11 +31,35 @@ jobs:
 
       - name: Bump version and Publish
         run: |
-          # Increment version (patch: 1.0.0 -> 1.0.1)
-          npm version patch -m "chore: bump version to %s [skip ci]"
+          # Try to bump version. If it fails (e.g. tag already exists), find the next available version.
+          if ! npm version patch -m "chore: bump version to %s [skip ci]"; then
+            echo "⚠️ Tag collision detected. Calculating next available version..."
+            
+            # Fetch tags to ensure we have the most recent ones
+            git fetch --tags
+            
+            # Get latest tag version and current package.json version
+            LATEST_TAG=$(git tag -l "v*" | sort -V | tail -n 1 | sed 's/v//')
+            CURR_VERSION=$(node -p "require('./package.json').version")
+            
+            # Determine base version to increment from (the highest of both)
+            if [ -z "$LATEST_TAG" ]; then
+              BASE_VERSION=$CURR_VERSION
+            else
+              # Use sort -V to compare versions properly
+              BASE_VERSION=$(printf '%s\n%s' "$CURR_VERSION" "$LATEST_TAG" | sort -V | tail -n 1)
+            fi
+            
+            # Split version and increment the patch (last) part
+            NEXT_VERSION=$(echo $BASE_VERSION | awk -F. '{$NF = $NF + 1;} 1' OFS=.)
+            echo "🚀 Resilience: Bumping to $NEXT_VERSION instead of $(node -p "require('./package.json').version")"
+            
+            # Set the new version forcibly
+            npm version $NEXT_VERSION --allow-same-version -m "chore: bump version to %s [skip ci]"
+          fi
           
           # Push the version commit and tag back to the repo
-          git push --follow-tags
+          git push origin main --follow-tags
           
           # Publish to NPM
           npm publish
