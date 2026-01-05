@@ -216,8 +216,15 @@ TapTapp AR uses a proprietary **Moonshot Vision Codec** that is significantly mo
 
 ---
 
-## 📄 License & Credits
+## 📄 License & Recognition
 
-MIT © [srsergiolazaro](https://github.com/srsergiolazaro)
+**Taptapp AR** is created and maintained by **Sergio Lazaro**.
 
-Based on the core research of MindAR, but completely re-written for high-performance binary processing and JS-only execution.
+This project is licensed under the **GPL-3.0 License**.
+This ensures that the project remains open and free, and that authorship is properly recognized. No "closed-source" usage is allowed without a commercial agreement.
+
+Commercial licenses are available for proprietary applications. Please contact the author for details.
+
+### Acknowledgements
+This project evolved from the incredible work of [MindAR](https://github.com/hiukim/mind-ar-js). While the codebase has been extensively rewritten and optimized for performance, we gratefully acknowledge the foundation laid by the original authors.
+
