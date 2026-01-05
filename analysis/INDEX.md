@@ -18,6 +18,8 @@ La optimización se divide en cuatro pilares fundamentales de innovación:
     *   Distribución de carga de trabajo para reducir los tiempos de espera del usuario.
 6. **[Ficha Técnica de Benchmarks](./06_performance_benchmarks.md)**
     *   Consolidado de métricas y comparativa directa de hardware.
+7.  **[INFORME FINAL: Protocolo Moonshot V7](./07_FINAL_MOONSHOT_V7_REPORT.md)**
+    *   🌟 **Lectura Recomendada**: Explicación completa sin código de toda la transformación, métricas finales V7 y lógica de negocio.
 
 ## Cuadro Resumen de Métricas de Innovación
 

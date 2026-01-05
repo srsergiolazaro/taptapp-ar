@@ -1,5 +1,11 @@
 # @srsergio/taptapp-ar
 
+<p align="center">
+  <a href="./docs/technical-paper.pdf">📄 <b>Technical Paper (PDF)</b></a> &nbsp;|&nbsp;
+  <a href="./docs/index.html">🌐 <b>Official Website</b></a> &nbsp;|&nbsp;
+  <a href="./analysis/INDEX.md">📊 <b>Analysis Report</b></a>
+</p>
+
 🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) toolkit for **Node.js** and **Browser** environments. It provides an ultra-fast offline compiler and a lightweight runtime for image tracking.
 
 **100% Pure JavaScript**: This package is now completely independent of **TensorFlow.js** for both compilation and real-time tracking, resulting in massive performance gains and zero-latency initialization.
