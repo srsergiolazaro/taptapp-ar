@@ -33,20 +33,19 @@ class CropDetector {
   detectMoving(input) {
     const imageData = input;
 
-    // 🚀 MOONSHOT: Alternate between local crops and GLOBAL scan
-    // This solves the "not reading the whole screen" issue.
-    // Every 3 frames, we do a full screen downsampled scan.
-    if (this.lastRandomIndex % 3 === 0) {
+    // 🚀 MOONSHOT: High Frequency Global Scan
+    // Scan full screen every 2 frames when searching to guarantee instant recovery
+    if (this.lastRandomIndex % 2 === 0) {
       this.lastRandomIndex = (this.lastRandomIndex + 1) % 25;
       return this._detectGlobal(imageData);
     }
 
-    // Original moving crop logic for high-detail local detection
+    // Local crops (25 grid)
     const gridSize = 5;
     const idx = (this.lastRandomIndex - 1) % (gridSize * gridSize);
+    // ... rest of logic remains but we hit it less often because global scan is more successful
     const dx = idx % gridSize;
     const dy = Math.floor(idx / gridSize);
-
     const stepX = this.cropSize / 3;
     const stepY = this.cropSize / 3;
 
@@ -57,29 +56,26 @@ class CropDetector {
     startY = Math.max(0, Math.min(this.height - this.cropSize - 1, startY));
 
     this.lastRandomIndex = (this.lastRandomIndex + 1) % 25;
-
     return this._detect(imageData, startX, startY);
   }
 
-  /**
-   * Scans the ENTIRE frame by downsampling it to cropSize
-   */
   _detectGlobal(imageData) {
     const croppedData = new Float32Array(this.cropSize * this.cropSize);
     const scaleX = this.width / this.cropSize;
     const scaleY = this.height / this.cropSize;
 
-    // Fast downsample (nearest neighbor is enough for initial feature detection)
+    // Better sampling: avoid missing edges by jumping too much
     for (let y = 0; y < this.cropSize; y++) {
       const srcY = Math.floor(y * scaleY) * this.width;
       const dstY = y * this.cropSize;
       for (let x = 0; x < this.cropSize; x++) {
-        croppedData[dstY + x] = imageData[srcY + Math.floor(x * scaleX)];
+        // Average slightly to preserve gradients
+        const sx = Math.floor(x * scaleX);
+        croppedData[dstY + x] = (imageData[srcY + sx] + imageData[srcY + sx + 1]) * 0.5;
       }
     }
 
     const { featurePoints } = this.detector.detect(croppedData);
-
     featurePoints.forEach((p) => {
       p.x *= scaleX;
       p.y *= scaleY;
