@@ -1,6 +1,6 @@
 {
     "name": "@srsergio/taptapp-ar",
-    "version": "1.0.38",
+    "version": "1.0.39",
     "description": "AR Compiler for Node.js and Browser",
     "repository": {
         "type": "git",
