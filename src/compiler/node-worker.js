@@ -78,8 +78,13 @@ parentPort.on('message', async (msg) => {
 
             for (let i = 0; i < imageList.length; i++) {
                 const image = imageList[i];
-                // Disable internal pyramid (maxOctaves: 1) as we are already processing a scale list
-                const detector = new DetectorLite(image.width, image.height, { useLSH: true, maxOctaves: 1 });
+
+                // 🚀 SMART BITRATE (VBR): Now handled internally by DetectorLite via 'scale'
+                const detector = new DetectorLite(image.width, image.height, {
+                    useLSH: true,
+                    maxOctaves: 1,
+                    scale: image.scale
+                });
                 const { featurePoints: ps } = detector.detect(image.data);
 
                 const sortedPs = sortPoints(ps);

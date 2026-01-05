@@ -19,7 +19,6 @@ const PYRAMID_MIN_SIZE = 4; // Restored to 4 for better small-scale detection
 
 
 const NUM_BUCKETS_PER_DIMENSION = 10;
-const MAX_FEATURES_PER_BUCKET = 30; // Maximized to ensure robustness in Moonshot mode
 
 
 const ORIENTATION_NUM_BINS = 36;
@@ -58,6 +57,10 @@ export class DetectorLite {
         }
 
         this.numOctaves = options.maxOctaves !== undefined ? Math.min(numOctaves, options.maxOctaves) : numOctaves;
+
+        // 🚀 SMART BITRATE (VBR): Internal logic to decide feature density based on scale
+        const scale = options.scale !== undefined ? options.scale : 1.0;
+        this.maxFeaturesPerBucket = options.maxFeaturesPerBucket || Math.max(4, Math.floor(12 * Math.sqrt(scale)));
     }
 
     /**
@@ -350,7 +353,7 @@ export class DetectorLite {
      */
     _applyPrune(extremas) {
         const nBuckets = NUM_BUCKETS_PER_DIMENSION;
-        const nFeatures = MAX_FEATURES_PER_BUCKET;
+        const nFeatures = this.maxFeaturesPerBucket;
 
         // Agrupar por buckets
         const buckets = [];

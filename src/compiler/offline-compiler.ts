@@ -155,8 +155,12 @@ export class OfflineCompiler {
             const keyframes = [];
 
             for (const image of imageList as any[]) {
-                // Disabling internal pyramid (maxOctaves: 1) as we are already processing a scale list
-                const detector = new DetectorLite(image.width, image.height, { useLSH: true, maxOctaves: 1 });
+                // 🚀 SMART BITRATE (VBR): Internalized in DetectorLite
+                const detector = new DetectorLite(image.width, image.height, {
+                    useLSH: true,
+                    maxOctaves: 1,
+                    scale: image.scale
+                });
                 const { featurePoints: ps } = detector.detect(image.data);
 
                 const maximaPoints = ps.filter((p: any) => p.maxima);

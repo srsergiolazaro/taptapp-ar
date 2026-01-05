@@ -5,7 +5,7 @@ import { resize } from "./utils/images.js";
  * Un valor más bajo permite detectar imágenes más pequeñas pero aumenta el tiempo de procesamiento
  * @constant {number}
  */
-const MIN_IMAGE_PIXEL_SIZE = 32;
+const MIN_IMAGE_PIXEL_SIZE = 40; // Increased to 40 to skip extremely small, noisy layers and reduce size
 
 
 
@@ -21,9 +21,8 @@ const buildImageList = (inputImage) => {
   let c = minScale;
   while (true) {
     scaleList.push(c);
-    // Optimization: Paso balanceado (aprox 1.5)
-    // Mejor cobertura que 2.0, pero mucho más ligero que 1.41 o 1.26
-    c *= Math.pow(2.0, 0.6);
+    // Optimization: More aggressive step (pow(2, 0.75) approx 1.68) for smaller exports
+    c *= Math.pow(2.0, 0.75);
     if (c >= 0.95) {
       c = 1;
       break;
