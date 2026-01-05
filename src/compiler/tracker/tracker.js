@@ -61,7 +61,6 @@ class Tracker {
 
   track(inputData, lastModelViewTransform, targetIndex) {
     let debugExtra = {};
-    if (!lastModelViewTransform) return { worldCoords: [], screenCoords: [], octaveIndex: 0, debugExtra };
 
     // Select the best octave based on current estimated distance/scale
     // We want the octave where the marker size is closest to its projected size on screen
@@ -128,7 +127,17 @@ class Tracker {
       }
     }
 
-    return { worldCoords, screenCoords, octaveIndex, debugExtra };
+    if (this.debugMode) {
+      debugExtra = {
+        octaveIndex,
+        projectedImage: Array.from(projectedImage),
+        matchingPoints,
+        goodTrack,
+        trackedPoints: screenCoords,
+      };
+    }
+
+    return { worldCoords, screenCoords, debugExtra };
   }
 
   /**
@@ -289,34 +298,6 @@ class Tracker {
           projectedImage[jOffset + i] = 0;
         }
       }
-    }
-  }
-
-  /**
-   * Refines the target data (Living Mind Map) using actual camera feedback
-   * @param {number} targetIndex 
-   * @param {number} octaveIndex 
-   * @param {number} alpha - Blending factor (e.g. 0.1 for 10% new data)
-   */
-  applyLiveFeedback(targetIndex, octaveIndex, alpha) {
-    if (targetIndex === undefined || octaveIndex === undefined) return;
-    const targetPrebuilts = this.prebuiltData[targetIndex];
-    if (!targetPrebuilts) return;
-
-    const prebuilt = targetPrebuilts[octaveIndex];
-    if (!prebuilt || !prebuilt.projectedImage || !prebuilt.data) return;
-
-    const markerPixels = prebuilt.data;
-    const projectedPixels = prebuilt.projectedImage;
-    const count = markerPixels.length;
-
-    // Blend the projected (camera-sourced) pixels into the marker reference data
-    // This allows the NCC matching to adapt to real-world lighting and print quality
-    for (let i = 0; i < count; i++) {
-      const val = projectedPixels[i];
-      if (isNaN(val)) continue; // Don't pollute with NaN
-      // Simple linear blend
-      markerPixels[i] = (1 - alpha) * markerPixels[i] + alpha * val;
     }
   }
 }

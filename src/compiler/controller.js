@@ -226,22 +226,17 @@ class Controller {
     return { targetIndex: matchedTargetIndex, modelViewTransform };
   }
   async _trackAndUpdate(inputData, lastModelViewTransform, targetIndex) {
-    if (!lastModelViewTransform) return null;
-    const result = this.tracker.track(
+    const { worldCoords, screenCoords } = this.tracker.track(
       inputData,
       lastModelViewTransform,
       targetIndex,
     );
-    if (result.worldCoords.length < 6) return null; // Umbral de puntos mínimos para mantener el seguimiento
+    if (worldCoords.length < 6) return null; // Umbral de puntos mínimos para mantener el seguimiento
     const modelViewTransform = await this._workerTrackUpdate(lastModelViewTransform, {
-      worldCoords: result.worldCoords,
-      screenCoords: result.screenCoords,
+      worldCoords,
+      screenCoords,
     });
-    return {
-      modelViewTransform,
-      inliers: result.worldCoords.length,
-      octaveIndex: result.octaveIndex
-    };
+    return modelViewTransform;
   }
 
   processVideo(input) {
@@ -257,7 +252,6 @@ class Controller {
         currentModelViewTransform: null,
         trackCount: 0,
         trackMiss: 0,
-        stabilityCount: 0, // Nuevo: Contador para Live Adaptation
         filter: new OneEuroFilter({ minCutOff: this.filterMinCF, beta: this.filterBeta }),
       });
     }
@@ -273,14 +267,11 @@ class Controller {
         }, 0);
 
         // detect and match only if less then maxTrack
-        // BUG FIX: Only match if we are NOT in a "ghosting" period for a target
-        // to prevent the "found but immediately lost" loop that keeps opacity at 1.
         if (nTracking < this.maxTrack) {
           const matchingIndexes = [];
           for (let i = 0; i < this.trackingStates.length; i++) {
             const trackingState = this.trackingStates[i];
             if (trackingState.isTracking === true) continue;
-            if (trackingState.showing === true) continue; // Don't try to re-detect if we are still buffers-showing the last position
             if (this.interestedTargetIndex !== -1 && this.interestedTargetIndex !== i) continue;
 
             matchingIndexes.push(i);
@@ -289,7 +280,7 @@ class Controller {
           const { targetIndex: matchedTargetIndex, modelViewTransform } =
             await this._detectAndMatch(inputData, matchingIndexes);
 
-          if (matchedTargetIndex !== -1 && modelViewTransform) {
+          if (matchedTargetIndex !== -1) {
             this.trackingStates[matchedTargetIndex].isTracking = true;
             this.trackingStates[matchedTargetIndex].currentModelViewTransform = modelViewTransform;
           }
@@ -300,89 +291,69 @@ class Controller {
           const trackingState = this.trackingStates[i];
 
           if (trackingState.isTracking) {
-            if (!trackingState.currentModelViewTransform) {
+            let modelViewTransform = await this._trackAndUpdate(
+              inputData,
+              trackingState.currentModelViewTransform,
+              i,
+            );
+            if (modelViewTransform === null) {
               trackingState.isTracking = false;
-              trackingState.stabilityCount = 0;
             } else {
-              let result = await this._trackAndUpdate(
-                inputData,
-                trackingState.currentModelViewTransform,
-                i,
-              );
-              if (result === null) {
-                trackingState.isTracking = false;
-                trackingState.stabilityCount = 0;
-              } else {
-                trackingState.currentModelViewTransform = result.modelViewTransform;
-
-                // --- LIVE MODEL ADAPTATION LOGIC ---
-                // Si el tracking es muy sólido (muchos inliers) y estable, refinamos el modelo
-                // Requisito: > 35 inliers (muy exigente) para evitar polución por ruido
-                if (result.inliers > 35) {
-                  trackingState.stabilityCount++;
-                  if (trackingState.stabilityCount > 30) { // 30 frames (~1s) de estabilidad absoluta
-                    this.tracker.applyLiveFeedback(i, result.octaveIndex, 0.05); // Menor alpha (5%) para ser más conservador
-                    if (this.debugMode) console.log(`✨ Live Reification: Target ${i} (Octave ${result.octaveIndex}) updated.`);
-                    trackingState.stabilityCount = 0;
-                  }
-                } else {
-                  trackingState.stabilityCount = Math.max(0, trackingState.stabilityCount - 1);
-                }
-                // -----------------------------------
-              }
-            }
-
-            // if not showing, then show it once it reaches warmup number of frames
-            if (!trackingState.showing) {
-              if (trackingState.isTracking) {
-                trackingState.trackMiss = 0;
-                trackingState.trackCount += 1;
-                if (trackingState.trackCount > this.warmupTolerance) {
-                  trackingState.showing = true;
-                  trackingState.trackingMatrix = null;
-                  trackingState.filter.reset();
-                }
-              }
-            }
-
-            // if showing, then count miss, and hide it when reaches tolerance
-            if (trackingState.showing) {
-              if (!trackingState.isTracking) {
-                trackingState.trackCount = 0;
-                trackingState.trackMiss += 1;
-
-                if (trackingState.trackMiss > this.missTolerance) {
-                  trackingState.showing = false;
-                  trackingState.trackingMatrix = null;
-                  this.onUpdate &&
-                    this.onUpdate({ type: "updateMatrix", targetIndex: i, worldMatrix: null });
-                }
-              } else {
-                trackingState.trackMiss = 0;
-              }
-            }
-
-            // if showing, then call onUpdate, with world matrix
-            if (trackingState.showing && trackingState.currentModelViewTransform) {
-              const worldMatrix = this._glModelViewMatrix(trackingState.currentModelViewTransform, i);
-              trackingState.trackingMatrix = trackingState.filter.filter(Date.now(), worldMatrix);
-
-              let clone = [];
-              for (let j = 0; j < trackingState.trackingMatrix.length; j++) {
-                clone[j] = trackingState.trackingMatrix[j];
-              }
-
-              const isInputRotated =
-                input.width === this.inputHeight && input.height === this.inputWidth;
-              if (isInputRotated) {
-                clone = this.getRotatedZ90Matrix(clone);
-              }
-
-              this.onUpdate &&
-                this.onUpdate({ type: "updateMatrix", targetIndex: i, worldMatrix: clone, modelViewTransform: trackingState.currentModelViewTransform });
+              trackingState.currentModelViewTransform = modelViewTransform;
             }
           }
+
+          // if not showing, then show it once it reaches warmup number of frames
+          if (!trackingState.showing) {
+            if (trackingState.isTracking) {
+              trackingState.trackMiss = 0;
+              trackingState.trackCount += 1;
+              if (trackingState.trackCount > this.warmupTolerance) {
+                trackingState.showing = true;
+                trackingState.trackingMatrix = null;
+                trackingState.filter.reset();
+              }
+            }
+          }
+
+          // if showing, then count miss, and hide it when reaches tolerance
+          if (trackingState.showing) {
+            if (!trackingState.isTracking) {
+              trackingState.trackCount = 0;
+              trackingState.trackMiss += 1;
+
+              if (trackingState.trackMiss > this.missTolerance) {
+                trackingState.showing = false;
+                trackingState.trackingMatrix = null;
+                this.onUpdate &&
+                  this.onUpdate({ type: "updateMatrix", targetIndex: i, worldMatrix: null });
+              }
+            } else {
+              trackingState.trackMiss = 0;
+            }
+          }
+
+          // if showing, then call onUpdate, with world matrix
+          if (trackingState.showing) {
+            const worldMatrix = this._glModelViewMatrix(trackingState.currentModelViewTransform, i);
+            trackingState.trackingMatrix = trackingState.filter.filter(Date.now(), worldMatrix);
+
+            let clone = [];
+            for (let j = 0; j < trackingState.trackingMatrix.length; j++) {
+              clone[j] = trackingState.trackingMatrix[j];
+            }
+
+            const isInputRotated =
+              input.width === this.inputHeight && input.height === this.inputWidth;
+            if (isInputRotated) {
+              clone = this.getRotatedZ90Matrix(clone);
+            }
+
+            this.onUpdate &&
+              this.onUpdate({ type: "updateMatrix", targetIndex: i, worldMatrix: clone, modelViewTransform: trackingState.currentModelViewTransform });
+          }
         }
+
         this.onUpdate && this.onUpdate({ type: "processDone" });
 
         // Use requestAnimationFrame if available, otherwise just wait briefly
@@ -530,7 +501,6 @@ class Controller {
   }
 
   _glModelViewMatrix(modelViewTransform, targetIndex) {
-    if (!modelViewTransform) return null;
     const height = this.markerDimensions[targetIndex][1];
 
     const openGLWorldMatrix = [
