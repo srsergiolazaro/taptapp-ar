@@ -226,20 +226,20 @@ class Controller {
     return { targetIndex: matchedTargetIndex, modelViewTransform };
   }
   async _trackAndUpdate(inputData, lastModelViewTransform, targetIndex) {
-    const { worldCoords, screenCoords, debugExtra } = this.tracker.track(
+    const result = this.tracker.track(
       inputData,
       lastModelViewTransform,
       targetIndex,
     );
-    if (worldCoords.length < 6) return null; // Umbral de puntos mínimos para mantener el seguimiento
+    if (result.worldCoords.length < 6) return null; // Umbral de puntos mínimos para mantener el seguimiento
     const modelViewTransform = await this._workerTrackUpdate(lastModelViewTransform, {
-      worldCoords,
-      screenCoords,
+      worldCoords: result.worldCoords,
+      screenCoords: result.screenCoords,
     });
     return {
       modelViewTransform,
-      inliers: worldCoords.length,
-      octaveIndex: debugExtra.octaveIndex
+      inliers: result.worldCoords.length,
+      octaveIndex: result.octaveIndex
     };
   }
 
@@ -272,11 +272,14 @@ class Controller {
         }, 0);
 
         // detect and match only if less then maxTrack
+        // BUG FIX: Only match if we are NOT in a "ghosting" period for a target
+        // to prevent the "found but immediately lost" loop that keeps opacity at 1.
         if (nTracking < this.maxTrack) {
           const matchingIndexes = [];
           for (let i = 0; i < this.trackingStates.length; i++) {
             const trackingState = this.trackingStates[i];
             if (trackingState.isTracking === true) continue;
+            if (trackingState.showing === true) continue; // Don't try to re-detect if we are still buffers-showing the last position
             if (this.interestedTargetIndex !== -1 && this.interestedTargetIndex !== i) continue;
 
             matchingIndexes.push(i);
@@ -285,7 +288,7 @@ class Controller {
           const { targetIndex: matchedTargetIndex, modelViewTransform } =
             await this._detectAndMatch(inputData, matchingIndexes);
 
-          if (matchedTargetIndex !== -1) {
+          if (matchedTargetIndex !== -1 && modelViewTransform) {
             this.trackingStates[matchedTargetIndex].isTracking = true;
             this.trackingStates[matchedTargetIndex].currentModelViewTransform = modelViewTransform;
           }
@@ -309,12 +312,13 @@ class Controller {
 
               // --- LIVE MODEL ADAPTATION LOGIC ---
               // Si el tracking es muy sólido (muchos inliers) y estable, refinamos el modelo
-              if (result.inliers > 25) {
+              // Requisito: > 35 inliers (muy exigente) para evitar polución por ruido
+              if (result.inliers > 35) {
                 trackingState.stabilityCount++;
-                if (trackingState.stabilityCount > 20) { // 20 frames de estabilidad absoluta
-                  this.tracker.applyLiveFeedback(i, result.octaveIndex, 0.1); // 10% de mezcla real
-                  if (this.debugMode) console.log(`✨ Live Reification: Target ${i} (Octave ${result.octaveIndex}) updated with real-world textures.`);
-                  trackingState.stabilityCount = 0; // Reset para la siguiente actualización
+                if (trackingState.stabilityCount > 30) { // 30 frames (~1s) de estabilidad absoluta
+                  this.tracker.applyLiveFeedback(i, result.octaveIndex, 0.05); // Menor alpha (5%) para ser más conservador
+                  if (this.debugMode) console.log(`✨ Live Reification: Target ${i} (Octave ${result.octaveIndex}) updated.`);
+                  trackingState.stabilityCount = 0;
                 }
               } else {
                 trackingState.stabilityCount = Math.max(0, trackingState.stabilityCount - 1);
@@ -354,7 +358,7 @@ class Controller {
           }
 
           // if showing, then call onUpdate, with world matrix
-          if (trackingState.showing) {
+          if (trackingState.showing && trackingState.currentModelViewTransform) {
             const worldMatrix = this._glModelViewMatrix(trackingState.currentModelViewTransform, i);
             trackingState.trackingMatrix = trackingState.filter.filter(Date.now(), worldMatrix);
 
@@ -521,6 +525,7 @@ class Controller {
   }
 
   _glModelViewMatrix(modelViewTransform, targetIndex) {
+    if (!modelViewTransform) return null;
     const height = this.markerDimensions[targetIndex][1];
 
     const openGLWorldMatrix = [

@@ -127,17 +127,7 @@ class Tracker {
       }
     }
 
-    if (this.debugMode) {
-      debugExtra = {
-        octaveIndex,
-        projectedImage: Array.from(projectedImage),
-        matchingPoints,
-        goodTrack,
-        trackedPoints: screenCoords,
-      };
-    }
-
-    return { worldCoords, screenCoords, debugExtra };
+    return { worldCoords, screenCoords, octaveIndex, debugExtra };
   }
 
   /**
@@ -308,8 +298,12 @@ class Tracker {
    * @param {number} alpha - Blending factor (e.g. 0.1 for 10% new data)
    */
   applyLiveFeedback(targetIndex, octaveIndex, alpha) {
-    const prebuilt = this.prebuiltData[targetIndex][octaveIndex];
-    if (!prebuilt || !prebuilt.projectedImage) return;
+    if (targetIndex === undefined || octaveIndex === undefined) return;
+    const targetPrebuilts = this.prebuiltData[targetIndex];
+    if (!targetPrebuilts) return;
+
+    const prebuilt = targetPrebuilts[octaveIndex];
+    if (!prebuilt || !prebuilt.projectedImage || !prebuilt.data) return;
 
     const markerPixels = prebuilt.data;
     const projectedPixels = prebuilt.projectedImage;
@@ -318,8 +312,10 @@ class Tracker {
     // Blend the projected (camera-sourced) pixels into the marker reference data
     // This allows the NCC matching to adapt to real-world lighting and print quality
     for (let i = 0; i < count; i++) {
+      const val = projectedPixels[i];
+      if (isNaN(val)) continue; // Don't pollute with NaN
       // Simple linear blend
-      markerPixels[i] = (1 - alpha) * markerPixels[i] + alpha * projectedPixels[i];
+      markerPixels[i] = (1 - alpha) * markerPixels[i] + alpha * val;
     }
   }
 }
