@@ -275,61 +275,94 @@ class Controller {
         const stabilities = state.pointStabilities[octaveIndex];
         const lastCoords = state.lastScreenCoords[octaveIndex];
 
-        // Update stability for ALL points in the current octave
+        // 🚀 NON-LINEAR TENSOR INFLUENCE CALCULATION
+        const jitterSigma = 5.0; // Tolerance for movement in pixels
+        const invTwoSigmaSq = 1.0 / (2.0 * jitterSigma * jitterSigma);
+
         for (let i = 0; i < stabilities.length; i++) {
             const isCurrentlyTracked = indices.includes(i);
             if (isCurrentlyTracked) {
                 const idxInResult = indices.indexOf(i);
-                stabilities[i] = Math.min(1.0, stabilities[i] + 0.4); // Fast attack
-                lastCoords[i] = screenCoords[idxInResult]; // Update last known position
+                const currentPos = screenCoords[idxInResult];
+                const prevPos = lastCoords[i];
+
+                // 1. Jitter Penalty (Gaussian): If it moves too much, it's not an anchor
+                let jitterPenalty = 1.0;
+                if (prevPos) {
+                    const distSq = Math.pow(currentPos.x - prevPos.x, 2) + Math.pow(currentPos.y - prevPos.y, 2);
+                    jitterPenalty = Math.exp(-distSq * invTwoSigmaSq);
+                }
+
+                // 2. Fast Attack but modulated by Jitter
+                stabilities[i] = Math.min(1.0, stabilities[i] + 0.4 * jitterPenalty);
+                lastCoords[i] = currentPos;
             } else {
-                stabilities[i] = Math.max(0.0, stabilities[i] - 0.08); // Slow decay (approx 12 frames/0.2s)
+                // 3. Slow decay for persistence
+                stabilities[i] = Math.max(0.0, stabilities[i] - 0.08);
             }
         }
 
-        // Collect points for the UI: both currently tracked AND hibernating
         const finalScreenCoords: any[] = [];
         const finalReliabilities: number[] = [];
-        const finalStabilities: number[] = [];
+        const finalWeights: number[] = []; // Replaces simple stabilities
         const finalWorldCoords: any[] = [];
 
         for (let i = 0; i < stabilities.length; i++) {
-            if (stabilities[i] > 0) {
+            if (stabilities[i] > 0.05) { // Minimum threshold to keep in memory
                 const isCurrentlyTracked = indices.includes(i);
+
+                // 🧠 RICH MATHEMATICS: Anchor Influence Function
+                // Formula: W = Stability^4 * Reliability^2
+                // Power-4 creates a steep curve: only truly persistent points (Stability > 0.9) get massive weight.
+                // Juniors use Linear (W = S), Seniors use Exponential/Power curves.
+                const s = stabilities[i];
+                const r = isCurrentlyTracked ? reliabilities[indices.indexOf(i)] : 0;
+                const moonshotWeight = Math.pow(s, 4) * Math.pow(r + 0.1, 2);
+
                 finalScreenCoords.push(lastCoords[i]);
-                finalStabilities.push(stabilities[i]);
+                finalWeights.push(moonshotWeight);
 
                 if (isCurrentlyTracked) {
-                    const idxInResult = indices.indexOf(i);
-                    finalReliabilities.push(reliabilities[idxInResult]);
-                    finalWorldCoords.push(worldCoords[idxInResult]);
+                    finalReliabilities.push(r);
+                    finalWorldCoords.push(worldCoords[indices.indexOf(i)]);
                 } else {
-                    finalReliabilities.push(0); // Hibernating points have 0 reliability
+                    finalReliabilities.push(0);
                 }
             }
         }
 
-        // STRICT QUALITY CHECK: We only update the transform if we have enough HIGH CONFIDENCE points
-        const stableAndReliable = reliabilities.filter((r: number, idx: number) => r > 0.8 && stabilities[indices[idx]] > 0.6).length;
+        // ⚖️ ANCHOR-DRIVEN QUALITY CHECK
+        // We calculate 'Total Trust' of the scene.
+        const totalTrust = finalWeights.reduce((a, b) => a + b, 0);
+        const highConfidenceAnchors = finalWeights.filter(w => w > 0.5).length;
 
-        if (stableAndReliable < 6 || finalWorldCoords.length < 8) {
+        // If 'Total Trust' is low, we don't move the 3D object to prevent "nervous" jumps.
+        if (highConfidenceAnchors < 4 || totalTrust < 2.0) {
             return {
                 modelViewTransform: null,
                 screenCoords: finalScreenCoords,
                 reliabilities: finalReliabilities,
-                stabilities: finalStabilities
+                stabilities: stabilities.filter(s => s > 0.05) // UI visualization
             };
         }
 
         const modelViewTransform = await this._workerTrackUpdate(lastModelViewTransform, {
             worldCoords: finalWorldCoords,
-            screenCoords: finalWorldCoords.map((_, i) => {
-                const globalIdx = indices[i];
-                return lastCoords[globalIdx];
+            screenCoords: finalWorldCoords.map((wc, i) => {
+                // Find the original index of this world coordinate in the 'worldCoords' array from tracker.track
+                const originalIdxInTracked = worldCoords.findIndex(item => item === wc);
+                // Use this original index to get the corresponding screen coordinate from the tracker.track result
+                return screenCoords[originalIdxInTracked];
             }),
-            stabilities: finalWorldCoords.map((_, i) => {
-                const globalIdx = indices[i];
-                return stabilities[globalIdx];
+            stabilities: finalWorldCoords.map((wc, i) => {
+                // Find the original index of this world coordinate in the 'worldCoords' array from tracker.track
+                const originalIdxInTracked = worldCoords.findIndex(item => item === wc);
+                // Get the global index from 'indices'
+                const globalIdx = indices[originalIdxInTracked];
+                // Find the index of this global point in the 'finalScreenCoords' array
+                const idxInFinalScreenCoords = finalScreenCoords.findIndex(item => item === lastCoords[globalIdx]);
+                // Return the corresponding weight from 'finalWeights'
+                return finalWeights[idxInFinalScreenCoords];
             })
         });
 
@@ -337,7 +370,7 @@ class Controller {
             modelViewTransform,
             screenCoords: finalScreenCoords,
             reliabilities: finalReliabilities,
-            stabilities: finalStabilities
+            stabilities: stabilities.filter(s => s > 0.05)
         };
     }
 
