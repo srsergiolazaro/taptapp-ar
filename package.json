@@ -1,7 +1,29 @@
 {
     "name": "@srsergio/taptapp-ar",
     "version": "1.0.79",
-    "description": "AR Compiler for Node.js and Browser",
+    "description": "Ultra-fast Augmented Reality (AR) SDK for Node.js and Browser. Image tracking with 100% pure JavaScript, zero-dependencies, and high-performance compilation.",
+    "keywords": [
+        "augmented reality",
+        "ar",
+        "image tracking",
+        "computer vision",
+        "webar",
+        "a-frame",
+        "three.js",
+        "ar.js",
+        "mindar",
+        "tracking",
+        "opencv",
+        "javascript",
+        "webgl",
+        "cross-platform",
+        "no-wasm",
+        "no-tfjs",
+        "webxr",
+        "natural-feature-tracking"
+    ],
+    "author": "Sergio Lázaro <slazaro.dev@gmail.com>",
+    "license": "MIT",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/srsergiolazaro/taptapp-ar.git"

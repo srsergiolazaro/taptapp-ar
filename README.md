@@ -1,8 +1,29 @@
 # @srsergio/taptapp-ar
 
+[![npm version](https://img.shields.io/npm/v/@srsergio/taptapp-ar.svg?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
+[![npm downloads](https://img.shields.io/npm/dm/@srsergio/taptapp-ar.svg?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@srsergio/taptapp-ar?style=flat-square)](https://bundlephobia.com/package/@srsergio/taptapp-ar)
+
 🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) toolkit for **Node.js** and **Browser** environments. It provides an ultra-fast offline compiler and a lightweight runtime for image tracking.
 
 **100% Pure JavaScript**: This package is now completely independent of **TensorFlow.js** for both compilation and real-time tracking, resulting in massive performance gains and zero-latency initialization.
+
+---
+
+## 📖 Table of Contents
+- [🌟 Key Features](#-key-features)
+- [🛠 Installation](#-installation)
+- [📊 Industry-Leading Benchmarks](#-industry-leading-benchmarks-v7-moonshot)
+- [🛡️ Robustness & Stability](#️-robustness--stability-stress-tested)
+- [🖼️ Compiler Usage](#️-compiler-usage-nodejs--web)
+- [🎥 Runtime Usage](#-runtime-usage-ar-tracking)
+  - [A-Frame Integration](#1-simple-a-frame-integration)
+  - [Three.js Wrapper](#2-high-performance-threejs-wrapper)
+  - [Raw Controller](#3-raw-controller-advanced--custom-engines)
+  - [Vanilla JS (SimpleAR)](#4-vanilla-js-no-framework-)
+- [🏗️ Protocol V7](#️-protocol-v7-moonshot-packed-format)
+- [📄 License & Credits](#-license--credits)
 
 ---
 
