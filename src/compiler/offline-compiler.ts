@@ -10,6 +10,7 @@ import { buildTrackingImageList, buildImageList } from "./image-list.js";
 import { extractTrackingFeatures } from "./tracker/extract-utils.js";
 import { DetectorLite } from "./detector/detector-lite.js";
 import { build as hierarchicalClusteringBuild } from "./matching/hierarchical-clustering.js";
+import { FourierEncoder } from "./utils/fourier-encoder.js";
 import * as msgpack from "@msgpack/msgpack";
 
 // Detect environment
@@ -21,6 +22,7 @@ const CURRENT_VERSION = 7; // Protocol v7: Moonshot - 4-bit Packed Tracking Data
 
 export class OfflineCompiler {
     data: any = null;
+    fourierEncoder = new FourierEncoder(4);
 
     constructor() {
         console.log("⚡ OfflineCompiler: Main thread mode (no workers)");
@@ -230,6 +232,7 @@ export class OfflineCompiler {
         const angle = new Int16Array(count);
         const scale = new Uint8Array(count);
         const descriptors = new Uint32Array(count * 2);
+        const fourier = new Int8Array(count * 16); // 4 frequencies * 4 components (sin/cos x/y)
 
         for (let i = 0; i < count; i++) {
             x[i] = Math.round((points[i].x / width) * 65535);
@@ -241,6 +244,12 @@ export class OfflineCompiler {
                 descriptors[i * 2] = points[i].descriptors[0];
                 descriptors[(i * 2) + 1] = points[i].descriptors[1];
             }
+
+            // 🚀 MOONSHOT: Fourier Positional Encoding
+            const feat = this.fourierEncoder.encode(points[i].x / width, points[i].y / height);
+            for (let j = 0; j < 16; j++) {
+                fourier[i * 16 + j] = Math.round(feat[j] * 127);
+            }
         }
 
         return {
@@ -249,6 +258,7 @@ export class OfflineCompiler {
             a: angle,
             s: scale,
             d: descriptors,
+            f: fourier,
             t: this._compactTree(tree.rootNode),
         };
     }
@@ -336,6 +346,9 @@ export class OfflineCompiler {
 
                     if (col.d instanceof Uint8Array) {
                         col.d = new Uint32Array(col.d.buffer.slice(col.d.byteOffset, col.d.byteOffset + col.d.byteLength));
+                    }
+                    if (col.f instanceof Uint8Array) {
+                        col.f = new Int8Array(col.f.buffer.slice(col.f.byteOffset, col.f.byteOffset + col.f.byteLength));
                     }
                 }
             }

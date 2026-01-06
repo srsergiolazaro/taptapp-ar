@@ -252,7 +252,7 @@ class Controller {
             featurePoints,
             targetIndexes,
         );
-        return { targetIndex: matchedTargetIndex, modelViewTransform };
+        return { targetIndex: matchedTargetIndex, modelViewTransform, featurePoints };
     }
 
     async _trackAndUpdate(inputData: any, lastModelViewTransform: number[][], targetIndex: number) {
