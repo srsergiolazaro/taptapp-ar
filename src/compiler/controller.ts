@@ -393,7 +393,14 @@ class Controller {
 
                     if (trackingState.showing) {
                         const worldMatrix = this._glModelViewMatrix(trackingState.currentModelViewTransform, i);
-                        const filteredMatrix = this.featureManager.applyWorldMatrixFilters(i, worldMatrix);
+
+                        // Calculate confidence score based on point stability
+                        const stabilities = trackingState.stabilities || [];
+                        const avgStability = stabilities.length > 0
+                            ? stabilities.reduce((a: number, b: number) => a + b, 0) / stabilities.length
+                            : 0;
+
+                        const filteredMatrix = this.featureManager.applyWorldMatrixFilters(i, worldMatrix, { stability: avgStability });
                         trackingState.trackingMatrix = filteredMatrix;
 
                         let finalMatrix = [...filteredMatrix];

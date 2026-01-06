@@ -39,7 +39,7 @@ export interface ControllerFeature extends Feature {
     /**
      * Hook to filter or modify the final world matrix
      */
-    filterWorldMatrix?(targetIndex: number, worldMatrix: number[]): number[];
+    filterWorldMatrix?(targetIndex: number, worldMatrix: number[], context?: any): number[];
 
     /**
      * Hook to decide if a target should be shown

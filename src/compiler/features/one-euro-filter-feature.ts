@@ -30,9 +30,19 @@ export class OneEuroFilterFeature implements ControllerFeature {
         return this.filters[targetIndex];
     }
 
-    filterWorldMatrix(targetIndex: number, worldMatrix: number[]): number[] {
+    filterWorldMatrix(targetIndex: number, worldMatrix: number[], context?: any): number[] {
         if (!this.enabled) return worldMatrix;
+
         const filter = this.getFilter(targetIndex);
+        const stability = context?.stability ?? 1.0;
+
+        // Dynamic Cutoff: If points are very stable (1.0), use higher cutoff (less responsiveness loss).
+        // If points are unstable (0.3), use much lower cutoff (heavy smoothing).
+        // We use a squared curve for even more aggressive suppression of jitter on unstable points.
+        const dynamicMinCutOff = this.minCutOff * (0.05 + Math.pow(stability, 2) * 0.95);
+        filter.minCutOff = dynamicMinCutOff;
+        filter.beta = this.beta;
+
         return filter.filter(Date.now(), worldMatrix);
     }
 

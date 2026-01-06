@@ -27,11 +27,11 @@ export class FeatureManager {
         }
     }
 
-    applyWorldMatrixFilters(targetIndex: number, worldMatrix: number[]): number[] {
+    applyWorldMatrixFilters(targetIndex: number, worldMatrix: number[], context?: any): number[] {
         let result = worldMatrix;
         for (const feature of this.features) {
             if (feature.enabled && feature.filterWorldMatrix) {
-                result = feature.filterWorldMatrix(targetIndex, result);
+                result = feature.filterWorldMatrix(targetIndex, result, context);
             }
         }
         return result;
