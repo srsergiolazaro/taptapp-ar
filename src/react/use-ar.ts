@@ -4,12 +4,19 @@ import type { SimpleAR as SimpleARType } from "../compiler/simple-ar.js";
 
 export type ARStatus = "scanning" | "tracking" | "error";
 
+export interface TrackedPoint {
+    x: number;
+    y: number;
+    reliability: number;
+}
+
 export interface UseARReturn {
     containerRef: React.RefObject<HTMLDivElement>;
     overlayRef: React.RefObject<HTMLVideoElement | HTMLImageElement>;
     status: ARStatus;
     isPlaying: boolean;
     toggleVideo: () => Promise<void>;
+    trackedPoints: TrackedPoint[];
 }
 
 export const useAR = (config: ARConfig): UseARReturn => {
@@ -17,6 +24,7 @@ export const useAR = (config: ARConfig): UseARReturn => {
     const overlayRef = useRef<HTMLVideoElement | HTMLImageElement>(null);
     const [status, setStatus] = useState<ARStatus>("scanning");
     const [isPlaying, setIsPlaying] = useState(false);
+    const [trackedPoints, setTrackedPoints] = useState<TrackedPoint[]>([]);
     const arInstanceRef = useRef<SimpleARType | null>(null);
 
     const toggleVideo = useCallback(async () => {
@@ -53,6 +61,16 @@ export const useAR = (config: ARConfig): UseARReturn => {
                     overlay: overlayRef.current!,
                     scale: config.scale,
                     debug: false,
+                    onUpdate: ({ screenCoords, reliabilities }) => {
+                        if (screenCoords && reliabilities) {
+                            const points = screenCoords.map((p, i) => ({
+                                x: p.x,
+                                y: p.y,
+                                reliability: reliabilities[i]
+                            }));
+                            setTrackedPoints(points);
+                        }
+                    },
                     onFound: async ({ targetIndex }) => {
                         console.log(`🎯 Target ${targetIndex} detected!`);
                         if (!isMounted) return;
@@ -72,6 +90,7 @@ export const useAR = (config: ARConfig): UseARReturn => {
                         console.log(`👋 Target ${targetIndex} lost`);
                         if (!isMounted) return;
                         setStatus("scanning");
+                        setTrackedPoints([]);
 
                         const overlay = overlayRef.current;
                         if (overlay instanceof HTMLVideoElement) {
@@ -105,6 +124,7 @@ export const useAR = (config: ARConfig): UseARReturn => {
         overlayRef,
         status,
         isPlaying,
-        toggleVideo
+        toggleVideo,
+        trackedPoints
     };
 };

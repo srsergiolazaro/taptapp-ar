@@ -235,7 +235,7 @@ const _query = ({ node, descriptors, querypoint, queue, keypointIndexes, numPop 
     if (dist !== minD) {
       queue.push({ node: childrenOrIndices[i], d: dist });
     } else {
-      _query({ node: childrenOrIndices[i], descriptors, querypoint, queue, keypointIndexes, numPop });
+      _query({ node: childrenOrIndices[i], descriptors, querypoint, queue, keypointIndexes, numPop: numPop + 1 });
     }
   }
 

@@ -2,9 +2,9 @@ import { buildModelViewProjectionTransform, computeScreenCoordiate } from "../es
 
 const AR2_DEFAULT_TS = 6;
 const AR2_DEFAULT_TS_GAP = 1;
-const AR2_SEARCH_SIZE = 34; // Increased from 18 to 34 for much better fast-motion tracking
+const AR2_SEARCH_SIZE = 25; // Reduced from 34 to 25 to prevent background latching
 const AR2_SEARCH_GAP = 1;
-const AR2_SIM_THRESH = 0.6;
+const AR2_SIM_THRESH = 0.65; // Increased from 0.6 to reduce false positives
 
 const TRACKING_KEYFRAME = 0; // 0: 128px (optimized)
 
@@ -119,6 +119,8 @@ class Tracker {
 
     const { px, py, s: scale } = trackingFrame;
 
+    const reliabilities = [];
+
     for (let i = 0; i < matchingPoints.length; i++) {
       if (sim[i] > AR2_SIM_THRESH && i < px.length) {
         goodTrack.push(i);
@@ -133,6 +135,7 @@ class Tracker {
           y: py[i] / scale,
           z: 0,
         });
+        reliabilities.push(sim[i]);
       }
     }
 
@@ -147,7 +150,7 @@ class Tracker {
 
       // If the points cover too little space compared to the screen size of the marker, it's a glitch
       if (detectedDiagonal < screenW * 0.15) {
-        return { worldCoords: [], screenCoords: [], debugExtra };
+        return { worldCoords: [], screenCoords: [], reliabilities: [], debugExtra };
       }
     }
     if (this.debugMode) {
@@ -160,7 +163,7 @@ class Tracker {
       };
     }
 
-    return { worldCoords, screenCoords, debugExtra };
+    return { worldCoords, screenCoords, reliabilities, debugExtra };
   }
 
   /**

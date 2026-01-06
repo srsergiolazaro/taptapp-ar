@@ -1,12 +1,11 @@
 import { Tracker } from "./tracker/tracker.js";
-import { CropDetector } from "./detector/crop-detector.js";
 import { OfflineCompiler as Compiler } from "./offline-compiler.js";
 import { InputLoader } from "./input-loader.js";
 import { FeatureManager } from "./features/feature-manager.js";
 import { OneEuroFilterFeature } from "./features/one-euro-filter-feature.js";
 import { TemporalFilterFeature } from "./features/temporal-filter-feature.js";
 import { AutoRotationFeature } from "./features/auto-rotation-feature.js";
-import { CropDetectionFeature } from "./features/crop-detection-feature.js";
+import { DetectorLite } from "./detector/detector-lite.js";
 
 let ControllerWorker: any;
 
@@ -26,7 +25,10 @@ ControllerWorker = await getControllerWorker();
 const DEFAULT_FILTER_CUTOFF = 0.5;
 const DEFAULT_FILTER_BETA = 0.1;
 const DEFAULT_WARMUP_TOLERANCE = 2; // Instant detection
-const DEFAULT_MISS_TOLERANCE = 5;   // More grace when partially hidden
+const DEFAULT_MISS_TOLERANCE = 1;   // Immediate response to tracking loss
+const WORKER_TIMEOUT_MS = 1000;    // Prevent worker hangs from killing the loop
+
+let loopIdCounter = 0;
 
 export interface ControllerOptions {
     inputWidth: number;
@@ -62,6 +64,7 @@ class Controller {
     mainThreadMatcher: any;
     mainThreadEstimator: any;
     featureManager: FeatureManager;
+    fullDetector: DetectorLite | null = null;
 
     constructor({
         inputWidth,
@@ -89,13 +92,16 @@ class Controller {
             missTolerance === null ? DEFAULT_MISS_TOLERANCE : missTolerance
         ));
         this.featureManager.addFeature(new AutoRotationFeature());
-        this.featureManager.addFeature(new CropDetectionFeature());
+        // User wants "sin recortes", so we don't add CropDetectionFeature
 
         this.inputLoader = new InputLoader(this.inputWidth, this.inputHeight);
         this.onUpdate = onUpdate;
         this.debugMode = debugMode;
         this.worker = worker;
         if (this.worker) this._setupWorkerListener();
+
+        // Moonshot: Full frame detector for better sensitivity
+        this.fullDetector = new DetectorLite(this.inputWidth, this.inputHeight, { useLSH: true });
 
         this.featureManager.init({
             inputWidth: this.inputWidth,
@@ -219,8 +225,7 @@ class Controller {
 
     dummyRun(input: any) {
         const inputData = this.inputLoader.loadInput(input);
-        const cropFeature = this.featureManager.getFeature<CropDetectionFeature>("crop-detection");
-        cropFeature?.detect(inputData, false);
+        this.fullDetector?.detect(inputData);
         this.tracker!.dummyRun(inputData);
     }
 
@@ -242,8 +247,7 @@ class Controller {
     }
 
     async _detectAndMatch(inputData: any, targetIndexes: number[]) {
-        const cropFeature = this.featureManager.getFeature<CropDetectionFeature>("crop-detection");
-        const { featurePoints } = cropFeature!.detect(inputData, true);
+        const { featurePoints } = this.fullDetector!.detect(inputData);
         const { targetIndex: matchedTargetIndex, modelViewTransform } = await this._workerMatch(
             featurePoints,
             targetIndexes,
@@ -252,22 +256,32 @@ class Controller {
     }
 
     async _trackAndUpdate(inputData: any, lastModelViewTransform: number[][], targetIndex: number) {
-        const { worldCoords, screenCoords } = this.tracker!.track(
+        const { worldCoords, screenCoords, reliabilities } = this.tracker!.track(
             inputData,
             lastModelViewTransform,
             targetIndex,
         );
-        if (worldCoords.length < 8) return null; // Resynced with Matcher (8 points) to allow initial detection
+
+        // STRICT QUALITY CHECK: Prevent "sticky" tracking on background noise.
+        // We require a minimum number of high-confidence points.
+        const highConfidencePoints = reliabilities.filter((r: number) => r > 0.75).length;
+        if (highConfidencePoints < 8) {
+            return null; // Force track loss if points are not reliable enough
+        }
+
+        if (worldCoords.length < 8) return null;
+
         const modelViewTransform = await this._workerTrackUpdate(lastModelViewTransform, {
             worldCoords,
             screenCoords,
         });
-        return modelViewTransform;
+        return { modelViewTransform, screenCoords, reliabilities };
     }
 
     processVideo(input: any) {
         if (this.processingVideo) return;
         this.processingVideo = true;
+        const currentLoopId = ++loopIdCounter; // Added for ghost loop prevention
 
         this.trackingStates = [];
         for (let i = 0; i < (this.markerDimensions?.length || 0); i++) {
@@ -282,7 +296,7 @@ class Controller {
 
         const startProcessing = async () => {
             while (true) {
-                if (!this.processingVideo) break;
+                if (!this.processingVideo || currentLoopId !== loopIdCounter) break;
 
                 const inputData = this.inputLoader.loadInput(input);
                 const nTracking = this.trackingStates.reduce((acc, s) => acc + (!!s.isTracking ? 1 : 0), 0);
@@ -309,15 +323,19 @@ class Controller {
                     const trackingState = this.trackingStates[i];
 
                     if (trackingState.isTracking) {
-                        let modelViewTransform = await this._trackAndUpdate(
+                        const result = await this._trackAndUpdate(
                             inputData,
                             trackingState.currentModelViewTransform,
                             i,
                         );
-                        if (modelViewTransform === null) {
+                        if (result === null || result.modelViewTransform === null) {
                             trackingState.isTracking = false;
+                            trackingState.screenCoords = [];
+                            trackingState.reliabilities = [];
                         } else {
-                            trackingState.currentModelViewTransform = modelViewTransform;
+                            trackingState.currentModelViewTransform = result.modelViewTransform;
+                            trackingState.screenCoords = result.screenCoords;
+                            trackingState.reliabilities = result.reliabilities;
                         }
                     }
 
@@ -349,7 +367,9 @@ class Controller {
                             type: "updateMatrix",
                             targetIndex: i,
                             worldMatrix: finalMatrix,
-                            modelViewTransform: trackingState.currentModelViewTransform
+                            modelViewTransform: trackingState.currentModelViewTransform,
+                            screenCoords: trackingState.screenCoords,
+                            reliabilities: trackingState.reliabilities
                         });
                     }
                 }
@@ -372,9 +392,8 @@ class Controller {
 
     async detect(input: any) {
         const inputData = this.inputLoader.loadInput(input);
-        const cropFeature = this.featureManager.getFeature<CropDetectionFeature>("crop-detection");
-        const { featurePoints, debugExtra } = cropFeature!.detect(inputData, false);
-        return { featurePoints, debugExtra };
+        const { featurePoints } = this.fullDetector!.detect(inputData);
+        return { featurePoints, debugExtra: {} };
     }
 
     async match(featurePoints: any, targetIndex: number) {
@@ -397,11 +416,18 @@ class Controller {
     _workerMatch(featurePoints: any, targetIndexes: number[]): Promise<any> {
         return new Promise((resolve) => {
             if (!this.worker) {
-                this._matchOnMainThread(featurePoints, targetIndexes).then(resolve);
+                this._matchOnMainThread(featurePoints, targetIndexes).then(resolve).catch(() => resolve({ targetIndex: -1 }));
                 return;
             }
 
+            const timeout = setTimeout(() => {
+                this.workerMatchDone = null;
+                resolve({ targetIndex: -1 });
+            }, WORKER_TIMEOUT_MS);
+
             this.workerMatchDone = (data: any) => {
+                clearTimeout(timeout);
+                this.workerMatchDone = null;
                 resolve({
                     targetIndex: data.targetIndex,
                     modelViewTransform: data.modelViewTransform,
@@ -460,11 +486,18 @@ class Controller {
     _workerTrackUpdate(modelViewTransform: number[][], trackingFeatures: any): Promise<any> {
         return new Promise((resolve) => {
             if (!this.worker) {
-                this._trackUpdateOnMainThread(modelViewTransform, trackingFeatures).then(resolve);
+                this._trackUpdateOnMainThread(modelViewTransform, trackingFeatures).then(resolve).catch(() => resolve(null));
                 return;
             }
 
+            const timeout = setTimeout(() => {
+                this.workerTrackDone = null;
+                resolve(null);
+            }, WORKER_TIMEOUT_MS);
+
             this.workerTrackDone = (data: any) => {
+                clearTimeout(timeout);
+                this.workerTrackDone = null;
                 resolve(data.modelViewTransform);
             };
             const { worldCoords, screenCoords } = trackingFeatures;

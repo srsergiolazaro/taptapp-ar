@@ -13,7 +13,12 @@ export interface SimpleAROptions {
     scale?: number;
     onFound?: ((data: { targetIndex: number }) => void | Promise<void>) | null;
     onLost?: ((data: { targetIndex: number }) => void | Promise<void>) | null;
-    onUpdate?: ((data: { targetIndex: number, worldMatrix: number[] }) => void) | null;
+    onUpdate?: ((data: {
+        targetIndex: number,
+        worldMatrix: number[],
+        screenCoords?: { x: number, y: number }[],
+        reliabilities?: number[]
+    }) => void) | null;
     cameraConfig?: MediaStreamConstraints['video'];
     debug?: boolean;
 }
@@ -25,7 +30,12 @@ class SimpleAR {
     scaleMultiplier: number;
     onFound: ((data: { targetIndex: number }) => void | Promise<void>) | null;
     onLost: ((data: { targetIndex: number }) => void | Promise<void>) | null;
-    onUpdateCallback: ((data: { targetIndex: number, worldMatrix: number[] }) => void) | null;
+    onUpdateCallback: ((data: {
+        targetIndex: number,
+        worldMatrix: number[],
+        screenCoords?: { x: number, y: number }[],
+        reliabilities?: number[]
+    }) => void) | null;
     cameraConfig: MediaStreamConstraints['video'];
     debug: boolean;
 
@@ -151,7 +161,7 @@ class SimpleAR {
             if (this.debug) this._updateDebugPanel(this.isTracking);
         }
 
-        const { targetIndex, worldMatrix, modelViewTransform } = data;
+        const { targetIndex, worldMatrix, modelViewTransform, screenCoords, reliabilities } = data;
 
         if (worldMatrix) {
             if (!this.isTracking) {
@@ -162,31 +172,59 @@ class SimpleAR {
 
             this.lastMatrix = worldMatrix;
 
-            if (!this.filters[targetIndex]) {
-                this.filters[targetIndex] = new OneEuroFilter({ minCutOff: 0.8, beta: 0.2 });
+            // We use the matrix from the controller directly (it's already filtered there)
+            this._positionOverlay(modelViewTransform, targetIndex);
+
+            // Project points to screen coordinates
+            let projectedPoints = [];
+            if (screenCoords && screenCoords.length > 0) {
+                const containerRect = this.container.getBoundingClientRect();
+                const videoW = this.video!.videoWidth;
+                const videoH = this.video!.videoHeight;
+                const isPortrait = containerRect.height > containerRect.width;
+                const isVideoLandscape = videoW > videoH;
+                const needsRotation = isPortrait && isVideoLandscape;
+                const proj = this.controller!.projectionTransform;
+
+                const vW = needsRotation ? videoH : videoW;
+                const vH = needsRotation ? videoW : videoH;
+                const pScale = Math.max(containerRect.width / vW, containerRect.height / vH);
+                const dW = vW * pScale;
+                const dH = vH * pScale;
+                const oX = (containerRect.width - dW) / 2;
+                const oY = (containerRect.height - dH) / 2;
+
+                projectedPoints = screenCoords.map((p: any) => {
+                    let sx, sy;
+                    if (needsRotation) {
+                        sx = oX + (dW / 2) - (p.y - proj[1][2]) * pScale;
+                        sy = oY + (dH / 2) + (p.x - proj[0][2]) * pScale;
+                    } else {
+                        sx = oX + (dW / 2) + (p.x - proj[0][2]) * pScale;
+                        sy = oY + (dH / 2) + (p.y - proj[1][2]) * pScale;
+                    }
+                    return { x: sx, y: sy };
+                });
             }
 
-            const flatMVT = [
-                modelViewTransform[0][0], modelViewTransform[0][1], modelViewTransform[0][2], modelViewTransform[0][3],
-                modelViewTransform[1][0], modelViewTransform[1][1], modelViewTransform[1][2], modelViewTransform[1][3],
-                modelViewTransform[2][0], modelViewTransform[2][1], modelViewTransform[2][2], modelViewTransform[2][3]
-            ];
-            const smoothedFlat = this.filters[targetIndex].filter(Date.now(), flatMVT);
-            const smoothedMVT = [
-                [smoothedFlat[0], smoothedFlat[1], smoothedFlat[2], smoothedFlat[3]],
-                [smoothedFlat[4], smoothedFlat[5], smoothedFlat[6], smoothedFlat[7]],
-                [smoothedFlat[8], smoothedFlat[9], smoothedFlat[10], smoothedFlat[11]]
-            ];
-
-            this._positionOverlay(smoothedMVT, targetIndex);
-            this.onUpdateCallback && this.onUpdateCallback({ targetIndex, worldMatrix });
+            this.onUpdateCallback && this.onUpdateCallback({
+                targetIndex,
+                worldMatrix,
+                screenCoords: projectedPoints,
+                reliabilities
+            });
 
         } else {
             if (this.isTracking) {
                 this.isTracking = false;
-                if (this.filters[targetIndex]) this.filters[targetIndex].reset();
                 this.overlay && (this.overlay.style.opacity = '0');
                 this.onLost && this.onLost({ targetIndex });
+                this.onUpdateCallback && this.onUpdateCallback({
+                    targetIndex,
+                    worldMatrix: null as any,
+                    screenCoords: [],
+                    reliabilities: []
+                });
             }
         }
     }

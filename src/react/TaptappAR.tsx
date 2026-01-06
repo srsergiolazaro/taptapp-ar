@@ -15,7 +15,7 @@ export const TaptappAR: React.FC<TaptappARProps> = ({
     showScanningOverlay = true,
     showErrorOverlay = true
 }) => {
-    const { containerRef, overlayRef, status, toggleVideo } = useAR(config);
+    const { containerRef, overlayRef, status, toggleVideo, trackedPoints } = useAR(config);
 
     // Simple heuristic to determine if it's a video or image
     // based on the presence of videoSrc and common extensions
@@ -88,6 +88,25 @@ export const TaptappAR: React.FC<TaptappARProps> = ({
                     />
                 )}
             </div>
+
+            {/* Tracking Points Layer */}
+            {status === "tracking" && (
+                <div className="taptapp-ar-points-overlay">
+                    {trackedPoints.filter(p => p.reliability > 0.7).map((point, i) => (
+                        <div
+                            key={i}
+                            className="tracking-point"
+                            style={{
+                                left: `${point.x}px`,
+                                top: `${point.y}px`,
+                                width: `${4 + point.reliability * 8}px`, // Reduced size slightly
+                                height: `${4 + point.reliability * 8}px`,
+                                opacity: 0.5 + (point.reliability * 0.5)
+                            }}
+                        />
+                    ))}
+                </div>
+            )}
 
             <style>{`
                 .taptapp-ar-wrapper {
@@ -172,6 +191,24 @@ export const TaptappAR: React.FC<TaptappARProps> = ({
                     opacity: 0;
                     pointer-events: none;
                     transition: opacity 0.3s ease;
+                }
+                .taptapp-ar-points-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 100; /* High z-index to be above overlay */
+                }
+                .tracking-point {
+                    position: absolute;
+                    background: black;
+                    border: 1px solid rgba(255,255,255,0.5); /* Better contrast */
+                    border-radius: 50%;
+                    transform: translate(-50%, -50%);
+                    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+                    pointer-events: none;
                 }
             `}</style>
         </div>
