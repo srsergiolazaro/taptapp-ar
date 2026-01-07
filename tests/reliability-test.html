@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TapTapp AR - Reliability & Simulation Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0c;
+            color: #e0e0e0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1320px;
+            width: 100%;
+        }
+        .card {
+            background: #16161a;
+            border: 1px solid #2a2a30;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; color: #4f46e5; }
+        canvas, .view-container {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid #333;
+            position: relative;
+            overflow: hidden;
+        }
+        #logs {
+            grid-column: span 2;
+            height: 250px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #10b981;
+        }
+        .stats {
+            margin-top: 10px;
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+        }
+        .stat-item { display: flex; gap: 8px; }
+        .stat-label { color: #888; }
+        .stat-value { font-weight: bold; }
+        
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100px;
+            height: 100px;
+            border: 3px solid #4f46e5;
+            background: rgba(79, 70, 229, 0.2);
+            display: none;
+            pointer-events: none;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .status-tracking { background: #065f46; color: #34d399; }
+        .status-searching { background: #7c2d12; color: #fb923c; }
+    </style>
+</head>
+<body>
+    <h1 style="margin-bottom: 30px; background: linear-gradient(90deg, #4f46e5, #9333ea); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AR Reliability Simulation</h1>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Simulation (Ground Truth)</h2>
+            <canvas id="simCanvas" width="640" height="480"></canvas>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">Scale:</span>
+                    <span id="simScale" class="stat-value">1.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Pos:</span>
+                    <span id="simPos" class="stat-value">0, 0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>AR Detection (Engine)</h2>
+            <div id="ar-container" class="view-container">
+                <!-- We will use a canvas instead of a video here to show the engine output -->
+                <canvas id="arCanvas" width="640" height="480"></canvas>
+                <div id="overlay"></div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">Status:</span>
+                    <span id="arStatus" class="status-tag status-searching">Searching</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Reliability:</span>
+                    <span id="arReliability" class="stat-value">0.00</span>
+                </div>
+                <div id="stabilityRow" class="stat-item">
+                    <span class="stat-label">Stability:</span>
+                    <span id="arStability" class="stat-value">0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="logs" class="card">Initializing Engine...</div>
+    </div>
+
+    <script type="module" src="./reliability-test-app.ts"></script>
+</body>
+</html>

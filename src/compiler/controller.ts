@@ -296,7 +296,11 @@ class Controller {
         for (let i = 0; i < stabilities.length; i++) {
             if (stabilities[i] > 0) {
                 const isCurrentlyTracked = indices.includes(i);
-                finalScreenCoords.push(lastCoords[i]);
+                finalScreenCoords.push({
+                    x: lastCoords[i].x,
+                    y: lastCoords[i].y,
+                    id: i // Unique index from tracker
+                });
                 finalStabilities.push(stabilities[i]);
 
                 if (isCurrentlyTracked) {
