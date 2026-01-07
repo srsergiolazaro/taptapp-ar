@@ -29,10 +29,12 @@
 
 ## 🌟 Key Features
 
-- 🖼️ **Hyper-Fast Compiler**: Pure JavaScript compiler that generates `.taar` files in **< 3s**.
+- 🎭 **Non-Rigid Surface Tracking**: Supports curved and deformable surfaces using **Delaunay Meshes** and **Mass-Spring Relaxation**.
+- 🚀 **Hyper-Fast Compiler**: Pure JavaScript compiler that generates `.taar` files in **< 3s**.
 - ⚡ **No TensorFlow Dependency**: No TFJS at all. Works natively in any JS environment (Node, Browser, Workers).
 - 🧬 **Fourier Positional Encoding**: Uses high-frequency sine/cosine mappings (GPT-style) for neural-like spatial consistency.
 - 🚀 **Protocol V7 (Moonshot)**: 
+  - **Delaunay Triangular Grid**: Adaptive mesh that tracks surface deformations.
   - **16-bit Fourier Signatures**: Spatial ADN embedded in every feature for harmonic matching.
   - **4-bit Packed Tracking Data**: Grayscale images are compressed to 4-bit depth, slashing file size.
   - **64-bit LSH Descriptors**: Optimized Locality Sensitive Hashing for descriptors.
@@ -54,9 +56,9 @@ npm install @srsergio/taptapp-ar
 
 | Metric | Official MindAR | TapTapp AR V7 | Improvement |
 | :--- | :--- | :--- | :--- |
-| **Compilation Time** | ~23.50s | **~2.61s** | 🚀 **~9x Faster** |
-| **Output Size (.taar)** | ~770 KB | **~50 KB** | 📉 **93% Smaller** |
-| **Descriptor Format** | 84-byte Float | **64-bit LSH** | 🧠 **Massive Data Saving** |
+| **Compilation Time** | ~23.50s | **~0.93s** | 🚀 **~25x Faster** |
+| **Output Size (.taar)** | ~770 KB | **~338 KB** | 📉 **56% Smaller** |
+| **Descriptor Format** | 84-byte Float | **128-bit LSH** | 🧠 **Massive Data Saving** |
 | **Tracking Data** | 8-bit Gray | **4-bit Packed** | 📦 **50% Data Saving** |
 | **Dependency Size** | ~20MB (TFJS) | **< 100KB** | 📦 **99% Smaller Bundle** |
 
@@ -68,11 +70,11 @@ The latest version has been rigorously tested with an adaptive stress test (`rob
 
 | Metric | Result | Description |
 | :--- | :--- | :--- |
-| **Pass Rate** | **96.3%** | High success rate across resolutions. |
-| **Drift Tolerance** | **< 15%** | Validated geometrically against ground truth metadata. |
+| **Pass Rate** | **93.5%** | High success rate across resolutions (202/216). |
+| **Drift Tolerance** | **< 10%** | Validated geometrically against ground truth metadata. |
 | **Tracking Precision** | **Float32** | Full 32-bit precision for optical flow tracking. |
-| **Detection Time** | **~21ms** | Ultra-fast initial detection on standard CPU. |
-| **Total Pipeline** | **~64ms** | Complete loop (Detect + Match + Track + Validate). |
+| **Detection Time** | **< 20ms** | Ultra-fast initial detection on standard CPU. |
+| **Total Pipeline** | **~45ms** | Complete loop (Detect + Match + Track + Validate). |
 
 ---
 
@@ -258,6 +260,8 @@ ar.stop();
 ## 🏗️ Protocol V7 (Moonshot Packed Format)
 TapTapp AR uses a proprietary **Moonshot Vision Codec** that is significantly more efficient than standard AR formats.
 
+- **Non-Rigid Surface Tracking**: Replaces the standard rigid homography with a dynamic **Delaunay Mesh**. This allows the tracker to follow the curvature of posters on cylinders, t-shirts, or slightly bent magazines.
+- **Mass-Spring Relaxation**: The tracking mesh is optimized using physical relaxation, minimizing L2 distance between predicted and tracked points while maintaining topological rigidity.
 - **Fourier Positional Encoding**: Maps 2D coordinates into a 16-dimensional frequency space. This creates a "Neural Consistency Check" that filters out noise and motion blur by checking for harmonic spatial agreement.
 - **4-bit Packed Tracking Data**: Image data used for optical flow is compressed to 4-bit depth.
 - **64-bit LSH Fingerprinting**: Feature descriptors are compressed to just 8 bytes using LSH.
@@ -271,3 +275,4 @@ TapTapp AR uses a proprietary **Moonshot Vision Codec** that is significantly mo
 MIT © [srsergiolazaro](https://github.com/srsergiolazaro)
 
 Based on the core research of MindAR, but completely re-written for high-performance binary processing and JS-only execution.
+
