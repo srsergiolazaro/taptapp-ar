@@ -1,0 +1,52 @@
+
+> @srsergio/taptapp-ar@1.0.91 test D:\Project\TapTapp\taptapp-ar
+> vitest "--run" "tests/e2e-detection.test.js"
+
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90mD:/Project/TapTapp/taptapp-ar[39m
+
+[90mstdout[2m | tests/e2e-detection.test.js[2m > [22m[2mEnd-to-End Detection (Protocol V9 - LSH)[2m > [22m[2mshould compile an image, export/import it, and detect it with high confidence (LSH)
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+🔨 Compiling target...
+
+[90mstdout[2m | tests/e2e-detection.test.js[2m > [22m[2mEnd-to-End Detection (Protocol V9 - LSH)[2m > [22m[2mshould compile an image, export/import it, and detect it with high confidence (LSH)
+[22m[39m⏱️ Compilación total: 1.941s
+
+[90mstdout[2m | tests/e2e-detection.test.js[2m > [22m[2mEnd-to-End Detection (Protocol V9 - LSH)[2m > [22m[2mshould compile an image, export/import it, and detect it with high confidence (LSH)
+[22m[39m📂 Exporting and importing .taar data...
+🔍 Detecting features in query image...
+🎯 Matching query features against imported target...
+MATCH_DL: Hamming found 223 initial matches
+✅ Result: KeyframeIndex=4, Inliers=201
+
+ [31m❯[39m tests/e2e-detection.test.js [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 2817[2mms[22m[39m
+[31m     [31m×[31m should compile an image, export/import it, and detect it with high confidence (LSH)[39m[33m 2814[2mms[22m[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/e2e-detection.test.js > End-to-End Detection (Protocol V9 - LSH) > should compile an image, export/import it, and detect it with high confidence (LSH)
+AssertionError: expected 4 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 4
+
+ ❯ tests/e2e-detection.test.js:59:38
+     57|         // ASSERTIONS
+     58|         // Keyframe index 0 (our only image)
+     59|         expect(result.keyframeIndex).toBe(0);
+       |                                      ^
+     60| 
+     61|         // Inliers should be high for the same image (usually > 100 fo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 17:24:31
+[2m   Duration [22m 4.12s[2m (transform 306ms, setup 0ms, import 900ms, tests 2.82s, environment 0ms)[22m
+
+ ELIFECYCLE  Test failed. See above for more details.

@@ -12,8 +12,8 @@ const MIN_IMAGE_PIXEL_SIZE = AR_CONFIG.MIN_IMAGE_PIXEL_SIZE;
 
 /**
  * Construye una lista de imágenes con diferentes escalas para detección de características
- * @param {Object} inputImage - Imagen de entrada con propiedades width, height y data
- * @returns {Array<Object>} Lista de imágenes escaladas con propiedades data, width, height y scale
+ * @param {{width: number, height: number, data: any}} inputImage - Imagen de entrada con propiedades width, height y data
+ * @returns {Array<{data: Uint8Array, width: number, height: number, scale: number}>} Lista de imágenes escaladas con propiedades data, width, height y scale
  */
 const buildImageList = (inputImage) => {
   const minScale = MIN_IMAGE_PIXEL_SIZE / Math.min(inputImage.width, inputImage.height);
@@ -45,8 +45,8 @@ const buildImageList = (inputImage) => {
 /**
  * Construye una lista optimizada de imágenes para tracking
  * Genera dos versiones escaladas (256px y 128px) para tracking eficiente
- * @param {Object} inputImage - Imagen de entrada con propiedades width, height y data
- * @returns {Array<Object>} Lista de imágenes escaladas para tracking
+ * @param {{width: number, height: number, data: any}} inputImage - Imagen de entrada con propiedades width, height y data
+ * @returns {Array<{data: Uint8Array, width: number, height: number, scale: number}>} Lista de imágenes escaladas para tracking
  */
 const buildTrackingImageList = (inputImage) => {
   const minDimension = Math.min(inputImage.width, inputImage.height);

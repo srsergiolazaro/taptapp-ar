@@ -42,9 +42,15 @@ overlayCanvas.height = HEIGHT;
 let testImage: HTMLImageElement | null = null;
 let targetData: any = null;
 
-function log(msg: string, type: 'info' | 'error' | 'success' = 'info') {
+function log(msg: string, type: 'info' | 'error' | 'success' | 'warning' = 'info') {
     const div = document.createElement('div');
-    div.style.color = type === 'error' ? '#f44' : type === 'success' ? '#10b981' : '#ccc';
+    const colors = {
+        'error': '#f44',
+        'success': '#10b981',
+        'warning': '#f59e0b',
+        'info': '#ccc'
+    };
+    div.style.color = colors[type];
     div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
     logs.prepend(div);
 }
@@ -149,7 +155,7 @@ btnRun.onclick = async () => {
                     screenCoords: matchingResult.screenCoords,
                     worldCoords: matchingResult.worldCoords
                 });
-                if (newPose) {
+                if (newPose && matchingResult.screenCoords) {
                     lastPose = newPose;
                     visualizePose(lastPose, matchingResult.screenCoords);
                 }

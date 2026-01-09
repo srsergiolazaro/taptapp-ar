@@ -1,0 +1,296 @@
+
+> @srsergio/taptapp-ar@1.0.91 test D:\Project\TapTapp\taptapp-ar
+> vitest "--run"
+
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90mD:/Project/TapTapp/taptapp-ar[39m
+
+[90mstdout[2m | tests/performance.test.js[2m > [22m[2mCompiler Performance Benchmark[2m > [22m[2mshould compile multiple images in parallel and measure performance
+[22m[39m🚀 Starting Multi-Image Performance Benchmark...
+⚡ OfflineCompiler: Main thread mode (no workers)
+📸 Loading test image: D:\Project\TapTapp\taptapp-ar\tests\assets\test-image.png
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould compile the test image to a .taar buffer
+[22m[39m📦 Compiling test image to buffer...
+⚡ OfflineCompiler: Main thread mode (no workers)
+
+[90mstdout[2m | tests/generate.test.js[2m > [22m[2mGenerator[2m > [22m[2mshould generate a .taar file in assets
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+📸 Loading image: D:\Project\TapTapp\taptapp-ar\tests\assets\test-image.png
+
+[90mstdout[2m | tests/compiler.test.js[2m > [22m[2mOfflineCompiler[2m > [22m[2mshould compile an image for tracking
+[22m[39m🚀 Starting OfflineCompiler test with Jimp...
+⚡ OfflineCompiler: Main thread mode (no workers)
+📸 Loading image with Jimp: D:\Project\TapTapp\taptapp-ar\tests\assets\test-image.png
+
+
+Compilation progress: 50.00%
+Compilation progress: 100.00%[90mstdout[2m | tests/compiler.test.js[2m > [22m[2mOfflineCompiler[2m > [22m[2mshould compile an image for tracking
+[22m[39m🖼️ Loaded image: 1024x1024
+🧪 Running compileTrack...
+
+[90mstdout[2m | tests/compiler.test.js[2m > [22m[2mOfflineCompiler[2m > [22m[2mshould compile an image for tracking
+[22m[39m
+✅ Compilation finished in 0.41s
+📈 Extracted 2 feature levels/sets
+📍 Found 60 points in the first level
+
+ [32m✓[39m tests/compiler.test.js [2m([22m[2m1 test[22m[2m)[22m[33m 1450[2mms[22m[39m
+     [33m[2m✓[22m[39m should compile an image for tracking [33m 1447[2mms[22m[39m
+
+Total Progress: 5.00%
+Progress: 5.00%
+Total Progress: 10.00%
+Progress: 10.00%[90mstdout[2m | tests/hdc.test.js[2m > [22m[2mHyperdimensional Computing (HDC)[2m > [22m[2mshould maintain similarity (LSH property in HDC space)
+[22m[39mHDC Dist (Similar): 0
+HDC Dist (Different): 1024
+
+ [32m✓[39m tests/hdc.test.js [2m([22m[2m3 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+
+Progress: 15.00%
+Total Progress: 15.00%[90mstdout[2m | tests/viewer.test.js[2m > [22m[2mAR Viewer (Controller)[2m > [22m[2mshould match a FULL target image (no crop)
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+
+
+Progress: 20.00%[90mstdout[2m | tests/e2e-detection.test.js[2m > [22m[2mEnd-to-End Detection (Protocol V9 - LSH)[2m > [22m[2mshould compile an image, export/import it, and detect it with high confidence (LSH)
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+🔨 Compiling target...
+
+
+Progress: 25.00%[90mstdout[2m | tests/matcher.test.js[2m > [22m[2mMatcher with Columnar Data[2m > [22m[2mshould match features using Matcher class
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+
+
+Progress: 30.00%
+Progress: 35.00%
+Progress: 40.00%
+Progress: 45.00%
+Progress: 50.00%[90mstdout[2m | tests/generate.test.js[2m > [22m[2mGenerator[2m > [22m[2mshould generate a .taar file in assets
+[22m[39m🧪 Compiling...
+
+
+Total Progress: 20.00%
+Total Progress: 25.00%[90mstdout[2m | tests/e2e-detection.test.js[2m > [22m[2mEnd-to-End Detection (Protocol V9 - LSH)[2m > [22m[2mshould compile an image, export/import it, and detect it with high confidence (LSH)
+[22m[39m⏱️ Compilación total: 3.921s
+
+[90mstdout[2m | tests/viewer.test.js[2m > [22m[2mAR Viewer (Controller)[2m > [22m[2mshould match a FULL target image (no crop)
+[22m[39m⏱️ Compilación total: 4.018s
+
+
+Total Progress: 30.00%
+Total Progress: 35.00%
+Total Progress: 40.00%
+Total Progress: 45.00%
+Total Progress: 50.00%[90mstdout[2m | tests/performance.test.js[2m > [22m[2mCompiler Performance Benchmark[2m > [22m[2mshould compile multiple images in parallel and measure performance
+[22m[39m🧪 Compiling 1 image...
+
+[90mstdout[2m | tests/matcher.test.js[2m > [22m[2mMatcher with Columnar Data[2m > [22m[2mshould match features using Matcher class
+[22m[39m⏱️ Compilación total: 3.964s
+
+
+Progress: 75.00%
+Progress: 100.00%[90mstdout[2m | tests/generate.test.js[2m > [22m[2mGenerator[2m > [22m[2mshould generate a .taar file in assets
+[22m[39m⏱️ Compilación total: 3.827s
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould compile the test image to a .taar buffer
+[22m[39m⏱️ Compilación total: 3.983s
+
+[90mstdout[2m | tests/generate.test.js[2m > [22m[2mGenerator[2m > [22m[2mshould generate a .taar file in assets
+[22m[39m
+✅ Saved to: D:\Project\TapTapp\taptapp-ar\tests\assets\targets.taar (832.77 KB)
+
+ [32m✓[39m tests/generate.test.js [2m([22m[2m1 test[22m[2m)[22m[33m 4841[2mms[22m[39m
+     [33m[2m✓[22m[39m should generate a .taar file in assets [33m 4827[2mms[22m[39m
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould compile the test image to a .taar buffer
+[22m[39m✅ Buffer created: 852757 bytes
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mOfflineCompiler should import data from exported buffer
+[22m[39m📦 Testing export/import cycle...
+⚡ OfflineCompiler: Main thread mode (no workers)
+
+
+Total Progress: 75.00%
+Total Progress: 100.00%[90mstdout[2m | tests/performance.test.js[2m > [22m[2mCompiler Performance Benchmark[2m > [22m[2mshould compile multiple images in parallel and measure performance
+[22m[39m⏱️ Compilación total: 4.348s
+
+[90mstdout[2m | tests/performance.test.js[2m > [22m[2mCompiler Performance Benchmark[2m > [22m[2mshould compile multiple images in parallel and measure performance
+[22m[39m
+
+🏁 Benchmark Results:
+⏱️ Total Duration: 4.35s
+📦 Exported Size: 0.81 MB (832.77 KB)
+
+✅ Image 1 Summary:
+   - Tracking points: 60
+   - Matching Layers (Keyframes):
+     Layer 0: Scale=1.0000, Dim=1024x1024, Points=9000 (Max:4986, Min:4014)
+     Layer 1: Scale=0.8706, Dim=891x891, Points=9000 (Max:4013, Min:4987)
+     Layer 2: Scale=0.5743, Dim=588x588, Points=9000 (Max:3677, Min:5323)
+     Layer 3: Scale=0.3789, Dim=388x388, Points=6980 (Max:3257, Min:3723)
+     Layer 4: Scale=0.2500, Dim=256x256, Points=3368 (Max:1511, Min:1857)
+     Layer 5: Scale=0.1649, Dim=169x169, Points=1634 (Max:727, Min:907)
+     Layer 6: Scale=0.1088, Dim=111x111, Points=771 (Max:328, Min:443)
+     Layer 7: Scale=0.0718, Dim=74x74, Points=341 (Max:133, Min:208)
+     Layer 8: Scale=0.0474, Dim=49x49, Points=138 (Max:46, Min:92)
+     Layer 9: Scale=0.0313, Dim=32x32, Points=66 (Max:23, Min:43)
+
+🔍 Verifying compiled data with Controller...
+
+[90mstdout[2m | tests/accuracy-lsh.test.js[2m > [22m[2mLSH Binarizer Accuracy[2m > [22m[2mshould maintain relative distance (LSH property)
+[22m[39mLSH 128 Hamming Dist (Similar): 0
+LSH 128 Hamming Dist (Different): 64
+
+ [32m✓[39m tests/accuracy-lsh.test.js [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstdout[2m | tests/performance.test.js[2m > [22m[2mCompiler Performance Benchmark[2m > [22m[2mshould compile multiple images in parallel and measure performance
+[22m[39m   - Detected 5400 features in validation pass.
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mOfflineCompiler should import data from exported buffer
+[22m[39m⏱️ Compilación total: 2.787s
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mOfflineCompiler should import data from exported buffer
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+✅ Imported 1 target(s)
+   Target dimensions: 1024x1024
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould be able to combine multiple compiled buffers
+[22m[39m📦 Testing multi-buffer combination...
+⚡ OfflineCompiler: Main thread mode (no workers)
+
+ [31m❯[39m tests/viewer.test.js [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 10514[2mms[22m[39m
+[31m     [31m×[31m should match a FULL target image (no crop)[39m[33m 10511[2mms[22m[39m
+[90mstdout[2m | tests/matcher.test.js[2m > [22m[2mMatcher with Columnar Data[2m > [22m[2mshould match features using Matcher class
+[22m[39mMatched keyframe: [33m-1[39m
+Inliers: [90mundefined[39m
+
+[90mstdout[2m | tests/e2e-detection.test.js[2m > [22m[2mEnd-to-End Detection (Protocol V9 - LSH)[2m > [22m[2mshould compile an image, export/import it, and detect it with high confidence (LSH)
+[22m[39m📂 Exporting and importing .taar data...
+🔍 Detecting features in query image...
+🎯 Matching query features against imported target...
+MATCH_DL: Hamming found 162 initial matches
+✅ Result: KeyframeIndex=-1, Inliers=undefined
+
+ [31m❯[39m tests/matcher.test.js [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 11444[2mms[22m[39m
+[31m     [31m×[31m should match features using Matcher class[39m[33m 11441[2mms[22m[39m
+ [31m❯[39m tests/e2e-detection.test.js [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 11484[2mms[22m[39m
+[31m     [31m×[31m should compile an image, export/import it, and detect it with high confidence (LSH)[39m[33m 11480[2mms[22m[39m
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould be able to combine multiple compiled buffers
+[22m[39m⏱️ Compilación total: 2.714s
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould be able to combine multiple compiled buffers
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+
+[90mstdout[2m | tests/performance.test.js[2m > [22m[2mCompiler Performance Benchmark[2m > [22m[2mshould compile multiple images in parallel and measure performance
+[22m[39m   - Match Result: TargetIndex=-1
+   ❌ Target NOT found. Verification failed.
+
+ [31m❯[39m tests/performance.test.js [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 12690[2mms[22m[39m
+[31m     [31m×[31m should compile multiple images in parallel and measure performance[39m[33m 12687[2mms[22m[39m
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould be able to combine multiple compiled buffers
+[22m[39m⏱️ Compilación total: 1.374s
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould be able to combine multiple compiled buffers
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+✅ Combined 2 targets from 2 buffers
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould validate target indexing with multiple targets
+[22m[39m📦 Testing target indexing...
+⚡ OfflineCompiler: Main thread mode (no workers)
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould validate target indexing with multiple targets
+[22m[39m⏱️ Compilación total: 1.351s
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould validate target indexing with multiple targets
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould validate target indexing with multiple targets
+[22m[39m⏱️ Compilación total: 2.343s
+
+[90mstdout[2m | tests/multi-target.test.js[2m > [22m[2mMulti-Target Support[2m > [22m[2mshould validate target indexing with multiple targets
+[22m[39m⚡ OfflineCompiler: Main thread mode (no workers)
+✅ Target 0: 1024x1024
+✅ Target 1: 1024x1024
+
+ [32m✓[39m tests/multi-target.test.js [2m([22m[2m4 tests[22m[2m)[22m[33m 18869[2mms[22m[39m
+     [33m[2m✓[22m[39m should compile the test image to a .taar buffer [33m 4952[2mms[22m[39m
+     [33m[2m✓[22m[39m OfflineCompiler should import data from exported buffer [33m 3728[2mms[22m[39m
+     [33m[2m✓[22m[39m should be able to combine multiple compiled buffers [33m 5680[2mms[22m[39m
+     [33m[2m✓[22m[39m should validate target indexing with multiple targets [33m 4506[2mms[22m[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/e2e-detection.test.js > End-to-End Detection (Protocol V9 - LSH) > should compile an image, export/import it, and detect it with high confidence (LSH)
+AssertionError: expected -1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ -1
+
+ ❯ tests/e2e-detection.test.js:59:38
+     57|         // ASSERTIONS
+     58|         // Keyframe index 0 (our only image)
+     59|         expect(result.keyframeIndex).toBe(0);
+       |                                      ^
+     60| 
+     61|         // Inliers should be high for the same image (usually > 100 fo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/matcher.test.js > Matcher with Columnar Data > should match features using Matcher class
+AssertionError: expected -1 to be greater than or equal to 0
+ ❯ tests/matcher.test.js:47:31
+     45|         console.log("Inliers:", screenCoords?.length);
+     46| 
+     47|         expect(keyframeIndex).toBeGreaterThanOrEqual(0);
+       |                               ^
+     48|         expect(screenCoords.length).toBeGreaterThanOrEqual(6);
+     49|     }, 30000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/performance.test.js > Compiler Performance Benchmark > should compile multiple images in parallel and measure performance
+AssertionError: expected -1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ -1
+
+ ❯ tests/performance.test.js:101:29
+     99|         }
+    100| 
+    101|         expect(targetIndex).toBe(0);
+       |                             ^
+    102|         expect(modelViewTransform).toBeDefined();
+    103| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/viewer.test.js > AR Viewer (Controller) > should match a FULL target image (no crop)
+AssertionError: expected -1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ -1
+
+ ❯ tests/viewer.test.js:116:29
+    114|         const { targetIndex, modelViewTransform } = await controller.m…
+    115| 
+    116|         expect(targetIndex).toBe(0);
+       |                             ^
+    117|         expect(modelViewTransform).toBeDefined();
+    118|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+[2m Test Files [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m12 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 17:22:29
+[2m   Duration [22m 22.09s[2m (transform 3.14s, setup 0ms, import 14.82s, tests 71.33s, environment 3ms)[22m
+
+ ELIFECYCLE  Test failed. See above for more details.
