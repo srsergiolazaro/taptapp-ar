@@ -1,11 +1,12 @@
 import { resize } from "./utils/images.js";
+import { AR_CONFIG } from "./constants.js";
 
 /**
  * Tamaño mínimo de píxeles para el procesamiento de imágenes
  * Un valor más bajo permite detectar imágenes más pequeñas pero aumenta el tiempo de procesamiento
  * @constant {number}
  */
-const MIN_IMAGE_PIXEL_SIZE = 32;
+const MIN_IMAGE_PIXEL_SIZE = AR_CONFIG.MIN_IMAGE_PIXEL_SIZE;
 
 
 
@@ -23,7 +24,7 @@ const buildImageList = (inputImage) => {
     scaleList.push(c);
     // Optimization: Paso balanceado (aprox 1.5)
     // Mejor cobertura que 2.0, pero mucho más ligero que 1.41 o 1.26
-    c *= Math.pow(2.0, 0.6);
+    c *= Math.pow(2.0, AR_CONFIG.SCALE_STEP_EXPONENT);
     if (c >= 0.95) {
       c = 1;
       break;
@@ -52,8 +53,8 @@ const buildTrackingImageList = (inputImage) => {
   const scaleList = [];
   const imageList = [];
   // Generamos versiones de 256px y 128px para tracking robusto a diferentes distancias
-  scaleList.push(256.0 / minDimension);
-  scaleList.push(128.0 / minDimension);
+  scaleList.push(AR_CONFIG.TRACKING_DOWNSCALE_LEVEL_1 / minDimension);
+  scaleList.push(AR_CONFIG.TRACKING_DOWNSCALE_LEVEL_2 / minDimension);
   for (let i = 0; i < scaleList.length; i++) {
     imageList.push(
       Object.assign(resize({ image: inputImage, ratio: scaleList[i] }), { scale: scaleList[i] }),

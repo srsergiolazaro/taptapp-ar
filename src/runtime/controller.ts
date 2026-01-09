@@ -6,6 +6,7 @@ import { TemporalFilterFeature } from "../core/features/temporal-filter-feature.
 import { AutoRotationFeature } from "../core/features/auto-rotation-feature.js";
 import { DetectorLite } from "../core/detector/detector-lite.js";
 import * as protocol from "../core/protocol.js";
+import { AR_CONFIG } from "../core/constants.js";
 
 let ControllerWorker: any;
 
@@ -22,10 +23,10 @@ const getControllerWorker = async () => {
 };
 ControllerWorker = await getControllerWorker();
 
-const DEFAULT_FILTER_CUTOFF = 0.5;
-const DEFAULT_FILTER_BETA = 0.1;
-const DEFAULT_WARMUP_TOLERANCE = 2; // Instant detection
-const DEFAULT_MISS_TOLERANCE = 1;   // Immediate response to tracking loss
+const DEFAULT_FILTER_CUTOFF = AR_CONFIG.ONE_EURO_FILTER_CUTOFF;
+const DEFAULT_FILTER_BETA = AR_CONFIG.ONE_EURO_FILTER_BETA;
+const DEFAULT_WARMUP_TOLERANCE = AR_CONFIG.WARMUP_TOLERANCE;
+const DEFAULT_MISS_TOLERANCE = AR_CONFIG.MISS_TOLERANCE;
 const WORKER_TIMEOUT_MS = 1000;    // Prevent worker hangs from killing the loop
 
 let loopIdCounter = 0;
@@ -103,8 +104,8 @@ class Controller {
 
         // Moonshot: Full frame detector for better sensitivity
         this.fullDetector = new DetectorLite(this.inputWidth, this.inputHeight, {
-            useLSH: true,
-            maxFeaturesPerBucket: 24 // Increased from 12 for better small target density
+            useLSH: AR_CONFIG.USE_LSH,
+            maxFeaturesPerBucket: AR_CONFIG.MAX_FEATURES_PER_BUCKET
         });
 
         this.featureManager.init({
@@ -114,9 +115,9 @@ class Controller {
             debugMode: this.debugMode
         });
 
-        const near = 1.0;
-        const far = 10000;
-        const fovy = (60.0 * Math.PI) / 180;
+        const near = AR_CONFIG.DEFAULT_NEAR;
+        const far = AR_CONFIG.DEFAULT_FAR;
+        const fovy = (AR_CONFIG.DEFAULT_FOVY * Math.PI) / 180;
         const f = this.inputHeight / 2 / Math.tan(fovy / 2);
 
         this.projectionTransform = [

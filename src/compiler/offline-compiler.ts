@@ -12,7 +12,8 @@ import { DetectorLite } from "../core/detector/detector-lite.js";
 import { build as hierarchicalClusteringBuild } from "../core/matching/hierarchical-clustering.js";
 import * as protocol from "../core/protocol.js";
 import { triangulate, getEdges } from "../core/utils/delaunay.js";
-import { generateBasis, projectDescriptor, compressToSignature } from "../core/matching/hdc.js";
+import { AR_CONFIG } from "../core/constants.js";
+
 
 // Detect environment
 const isNode = typeof process !== "undefined" &&
@@ -101,17 +102,8 @@ export class OfflineCompiler {
             const keyframes = [];
 
             for (const image of imageList as any[]) {
-                const detector = new DetectorLite(image.width, image.height, { useLSH: true, maxFeaturesPerBucket: 40 });
+                const detector = new DetectorLite(image.width, image.height, { useLSH: AR_CONFIG.USE_LSH, maxFeaturesPerBucket: AR_CONFIG.MAX_FEATURES_PER_BUCKET });
                 const { featurePoints: ps } = detector.detect(image.data);
-
-                // HDC Pre-calculation
-                const hdcBasis = generateBasis(protocol.HDC_SEED, 1024);
-                for (const p of ps) {
-                    if (p.descriptors) {
-                        const hv = projectDescriptor(p.descriptors, hdcBasis);
-                        p.hdcSignature = compressToSignature(hv);
-                    }
-                }
 
                 const maximaPoints = ps.filter((p: any) => p.maxima);
                 const minimaPoints = ps.filter((p: any) => !p.maxima);

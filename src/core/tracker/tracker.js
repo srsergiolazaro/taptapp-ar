@@ -1,11 +1,12 @@
 import { buildModelViewProjectionTransform, computeScreenCoordiate } from "../estimation/utils.js";
 import { refineNonRigid, projectMesh } from "../estimation/non-rigid-refine.js";
+import { AR_CONFIG } from "../constants.js";
 
-const AR2_DEFAULT_TS = 6;
+const AR2_DEFAULT_TS = AR_CONFIG.TRACKER_TEMPLATE_SIZE;
 const AR2_DEFAULT_TS_GAP = 1;
-const AR2_SEARCH_SIZE = 12; // Reduced from 25 to 12 for high-speed tracking (25 is overkill)
+const AR2_SEARCH_SIZE = AR_CONFIG.TRACKER_SEARCH_SIZE;
 const AR2_SEARCH_GAP = 1;
-const AR2_SIM_THRESH = 0.65; // Increased from 0.6 to reduce false positives
+const AR2_SIM_THRESH = AR_CONFIG.TRACKER_SIMILARITY_THRESHOLD;
 
 const TRACKING_KEYFRAME = 0; // 0: 128px (optimized)
 

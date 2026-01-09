@@ -4,12 +4,10 @@ import { Matcher } from "../src/core/matching/matcher.js";
 import { Estimator } from "../src/core/estimation/estimator.js";
 import { buildModelViewProjectionTransform, computeScreenCoordiate } from "../src/core/estimation/utils.js";
 import { decodeTaar } from "../src/core/protocol.js";
-import { compute as computeHamming } from "../src/core/matching/hamming-distance.js";
-import { refineWithMorphology } from "../src/core/estimation/morph-refinement.js";
 import { OfflineCompiler } from "../src/compiler/offline-compiler.js";
+import { AR_CONFIG } from "../src/core/constants.js";
 
 const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-const taarInput = document.getElementById('taarInput') as HTMLInputElement;
 const btnRun = document.getElementById('btnRun') as HTMLButtonElement;
 const mainCanvas = document.getElementById('mainCanvas') as HTMLCanvasElement;
 const overlayCanvas = document.getElementById('overlayCanvas') as HTMLCanvasElement;
@@ -23,11 +21,11 @@ const statMatches = document.getElementById('statMatches') as HTMLElement;
 const statInliers = document.getElementById('statInliers') as HTMLElement;
 const statConf = document.getElementById('statConf') as HTMLElement;
 
-const WIDTH = 640;
-const HEIGHT = 480;
+const WIDTH = AR_CONFIG.VIEWPORT_WIDTH;
+const HEIGHT = AR_CONFIG.VIEWPORT_HEIGHT;
 
 // Standard AR Camera Intrinsics (K)
-const fovy = (45.0 * Math.PI) / 180;
+const fovy = (AR_CONFIG.DEFAULT_FOVY * Math.PI) / 180;
 const f = HEIGHT / 2 / Math.tan(fovy / 2);
 const K = [
     [f, 0, WIDTH / 2],
@@ -90,23 +88,8 @@ fileInput.onchange = (e: any) => {
     reader.readAsDataURL(file);
 };
 
-taarInput.onchange = (e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        const buffer = event.target?.result as ArrayBuffer;
-        try {
-            const decoded = decodeTaar(buffer);
-            targetData = decoded.dataList;
-            statTarget.textContent = `Loaded (${targetData.length} targets)`;
-            log('TAAR Configuration loaded: ' + file.name, 'success');
-        } catch (err: any) {
-            log('Error decoding TAAR: ' + err.message, 'error');
-        }
-    };
-    reader.readAsArrayBuffer(file);
-};
+// Manual TAAR loading removed in favor of auto-compilation
+
 
 btnRun.onclick = async () => {
     if (!testImage) {
@@ -114,147 +97,149 @@ btnRun.onclick = async () => {
         return;
     }
 
-    log('Running deep diagnostic...');
+    log('Starting continuous diagnostic loop...', 'info');
     pyramidContainer.innerHTML = '';
-    overlayCtx.clearRect(0, 0, WIDTH, HEIGHT);
 
     const loader = new InputLoader(WIDTH, HEIGHT);
-    const greyData = loader.loadInput(mainCanvas as any);
+    const detector = new DetectorLite(WIDTH, HEIGHT, { useGPU: false, maxFeaturesPerBucket: AR_CONFIG.MAX_FEATURES_PER_BUCKET, useLSH: AR_CONFIG.USE_LSH });
+    const matcher = new Matcher(WIDTH, HEIGHT, true);
 
-    // INCREASED: 100 points per bucket to find target features hidden in background noise
-    const detector = new DetectorLite(WIDTH, HEIGHT, { useGPU: false, maxFeaturesPerBucket: 100 });
-    const result = detector.detect(greyData) as any;
+    let isTracking = false;
+    let lastPose: any = null;
 
-    log(`Detection complete. Found ${result.featurePoints.length} points.`);
+    const runFrame = async () => {
+        overlayCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        const greyData = loader.loadInput(mainCanvas as any);
 
-    /* Background points removed as requested */
+        if (!isTracking) {
+            // --- DETECTION PHASE ---
+            const result = detector.detect(greyData) as any;
+            if (targetData) {
+                const matchingResult = matcher.matchDetection(targetData[0].matchingData, result.featurePoints);
 
-    // 2. Visualize DoG Pyramid
-    // DetectorLite.detect returns { featurePoints, pyramid }
-    // pyramid is Array of Octaves, each Octave is [img1, img2]
-    if (result.pyramid) {
-        result.pyramid.forEach((octave: any[], i: number) => {
+                if (matchingResult.keyframeIndex !== -1 && matchingResult.screenCoords) {
+                    const k = matchingResult.keyframeIndex;
+                    log(`MATCH SUCCESS: Octave ${k}. Switching to Track...`, 'success');
+
+                    lastPose = estimator.estimate({
+                        screenCoords: matchingResult.screenCoords,
+                        worldCoords: matchingResult.worldCoords
+                    });
+
+                    if (lastPose) {
+                        isTracking = true;
+                        visualizePose(lastPose, matchingResult.screenCoords);
+                    }
+                }
+            }
+
+            // Show pyramid only once to avoid flickering
+            if (pyramidContainer.innerHTML === '' && result.pyramid) {
+                renderPyramid(result.pyramid);
+            }
+        } else {
+            // --- TRACKING SIMULATION PHASE ---
+            // In a real video this would use the tracker.track() and refineEstimate()
+            // Here we just re-run detection to show stability, but we follow the "Video" logic
+            const result = detector.detect(greyData) as any;
+            const matchingResult = matcher.matchDetection(targetData[0].matchingData, result.featurePoints);
+
+            if (matchingResult.keyframeIndex !== -1) {
+                const newPose = estimator.estimate({
+                    screenCoords: matchingResult.screenCoords,
+                    worldCoords: matchingResult.worldCoords
+                });
+                if (newPose) {
+                    lastPose = newPose;
+                    visualizePose(lastPose, matchingResult.screenCoords);
+                }
+            } else {
+                isTracking = false;
+                log('Tracking lost. Re-detecting...', 'warning');
+            }
+        }
+
+        requestAnimationFrame(runFrame);
+    };
+
+    const visualizePose = (pose: any, inliers: any[]) => {
+        statMatches.textContent = isTracking ? 'TRACKING' : 'FOUND';
+        statInliers.textContent = inliers.length.toString();
+        statConf.textContent = Math.min(100, (inliers.length / 15) * 100).toFixed(0) + '%';
+
+        // Draw Inliers
+        overlayCtx.fillStyle = '#0f0';
+        inliers.forEach((p: any) => {
+            overlayCtx.beginPath();
+            overlayCtx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+            overlayCtx.fill();
+        });
+
+        // Project Mesh
+        const MVP = buildModelViewProjectionTransform(K, pose);
+        const trackingData = targetData[0].trackingData[0]; // Oct 0 (256px usually)
+
+        if (trackingData && trackingData.mesh) {
+            const px = trackingData.px;
+            const py = trackingData.py;
+            const scale = trackingData.s; // 🚀 FIX: The scale of the tracking octave
+            const triangles = trackingData.mesh.t;
+
+            const projected = [];
+            for (let i = 0; i < px.length; i++) {
+                // 🎯 KEY FIX: Divide by scale to bring 256px-coords back to original image space
+                const p = computeScreenCoordiate(MVP, px[i] / scale, py[i] / scale, 0);
+                projected.push(p);
+            }
+
+            // Draw Mesh
+            overlayCtx.strokeStyle = 'rgba(0, 255, 255, 0.9)';
+            overlayCtx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+            overlayCtx.lineWidth = 2;
+            for (let i = 0; i < triangles.length; i += 3) {
+                const p1 = projected[triangles[i]];
+                const p2 = projected[triangles[i + 1]];
+                const p3 = projected[triangles[i + 2]];
+                if (!p1 || !p2 || !p3) continue;
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(p1.x, p1.y);
+                overlayCtx.lineTo(p2.x, p2.y);
+                overlayCtx.lineTo(p3.x, p3.y);
+                overlayCtx.closePath();
+                overlayCtx.fill();
+                overlayCtx.stroke();
+            }
+        }
+    };
+
+    const renderPyramid = (pyramid: any[]) => {
+        pyramid.forEach((octave: any[], i: number) => {
             const img1 = octave[0];
             const img2 = octave[1];
-
             const item = document.createElement('div');
             item.className = 'octave-item';
             item.innerHTML = `<strong>Octave ${i} (Scale 1:${Math.pow(2, i)})</strong>`;
-
             const oCanvas = document.createElement('canvas');
             oCanvas.width = img1.width;
             oCanvas.height = img1.height;
             const oCtx = oCanvas.getContext('2d')!;
-
-            // Draw Difference (Scaled for visibility)
             const dogData = new Uint8ClampedArray(img1.width * img1.height * 4);
             let maxDiff = 0;
-
             for (let j = 0; j < img1.data.length; j++) {
                 const diff = (img2.data[j] - img1.data[j]);
-                const val = 128 + diff * 10; // Boosted 10x and centered at gray
-
-                dogData[j * 4] = val;
-                dogData[j * 4 + 1] = val;
-                dogData[j * 4 + 2] = val;
-                dogData[j * 4 + 3] = 255;
-
+                const val = 128 + diff * 12;
+                dogData[j * 4] = val; dogData[j * 4 + 1] = val; dogData[j * 4 + 2] = val; dogData[j * 4 + 3] = 255;
                 if (Math.abs(diff) > maxDiff) maxDiff = Math.abs(diff);
             }
-
             oCtx.putImageData(new ImageData(dogData, img1.width, img1.height), 0, 0);
             item.appendChild(oCanvas);
-
-            const stats = document.createElement('div');
-            stats.textContent = `Max DoG: ${maxDiff.toFixed(4)}`;
-            item.appendChild(stats);
-
             pyramidContainer.appendChild(item);
         });
-    }
+    };
 
-    // 3. RUN MATCHING (If TAAR is loaded)
-    if (targetData) {
-        log('Running Matching Analysis...');
-        const matcher = new Matcher(WIDTH, HEIGHT, true);
-
-        let foundAny = false;
-        const queryPoints = result.featurePoints;
-
-        const matchingResult = matcher.matchDetection(targetData, queryPoints);
-
-        if (matchingResult.keyframeIndex !== -1 && matchingResult.screenCoords) {
-            const k = matchingResult.keyframeIndex;
-            const inliers = matchingResult.screenCoords;
-            log(`MATCH SUCCESS: Found ${inliers.length} inliers on Octave ${k}.`, 'success');
-
-            foundAny = true;
-            statMatches.textContent = `Found (Oct ${k})`;
-            statInliers.textContent = inliers.length.toString();
-            statConf.textContent = Math.min(100, (inliers.length / 15) * 100).toFixed(0) + '%';
-
-            overlayCtx.fillStyle = '#0f0';
-            inliers.forEach((p: any) => {
-                overlayCtx.beginPath();
-                overlayCtx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-                overlayCtx.fill();
-            });
-
-            // 🚀 MOONSHOT: 3D POSE PROJECTION
-            const pose = estimator.estimate({
-                screenCoords: matchingResult.screenCoords,
-                worldCoords: matchingResult.worldCoords
-            });
-
-            if (pose) {
-                log('Visualizing 3D Projected Mesh (PnP Solver)...', 'info');
-                const MVP = buildModelViewProjectionTransform(K, pose);
-
-                // 🔥 ALWAYS use Octave 0 for the Mesh (Highest Resolution)
-                const trackingData = targetData[matchingResult.targetIndex].trackingData[0];
-
-                if (trackingData && trackingData.mesh) {
-                    const px = trackingData.px;
-                    const py = trackingData.py;
-                    const triangles = trackingData.mesh.t;
-
-                    const projected = [];
-                    for (let i = 0; i < px.length; i++) {
-                        const p = computeScreenCoordiate(MVP, px[i], py[i], 0);
-                        projected.push(p);
-                    }
-
-                    // Draw Mesh
-                    overlayCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
-                    overlayCtx.fillStyle = 'rgba(0, 255, 255, 0.15)';
-                    overlayCtx.lineWidth = 1.5;
-                    for (let i = 0; i < triangles.length; i += 3) {
-                        const p1 = projected[triangles[i]];
-                        const p2 = projected[triangles[i + 1]];
-                        const p3 = projected[triangles[i + 2]];
-                        if (!p1 || !p2 || !p3) continue;
-                        overlayCtx.beginPath();
-                        overlayCtx.moveTo(p1.x, p1.y);
-                        overlayCtx.lineTo(p2.x, p2.y);
-                        overlayCtx.lineTo(p3.x, p3.y);
-                        overlayCtx.closePath();
-                        overlayCtx.fill();
-                        overlayCtx.stroke();
-                    }
-                }
-            }
-        }
-
-        if (!foundAny) {
-            log('Match Failed: The heatmap shows why.', 'error');
-            statMatches.textContent = 'None';
-            statInliers.textContent = '0';
-            statConf.textContent = '0%';
-        }
-    } else {
-        log('Skipping matching: No .taar loaded.', 'info');
-    }
+    runFrame();
 };
+
 
 // Help helper to load images as promises
 function loadImage(url: string): Promise<HTMLImageElement> {

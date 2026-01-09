@@ -1,10 +1,11 @@
 import { Controller } from '../src/runtime/controller.js';
 import { OfflineCompiler } from '../src/compiler/offline-compiler.js';
 import { projectToScreen } from '../src/core/utils/projection.js';
+import { AR_CONFIG } from '../src/core/constants.js';
 
 const ASSET_URL = './assets/test-image.png';
-const WIDTH = 640;
-const HEIGHT = 480;
+const WIDTH = AR_CONFIG.VIEWPORT_WIDTH;
+const HEIGHT = AR_CONFIG.VIEWPORT_HEIGHT;
 
 const simCanvas = document.getElementById('simCanvas') as HTMLCanvasElement;
 const arCanvas = document.getElementById('arCanvas') as HTMLCanvasElement;

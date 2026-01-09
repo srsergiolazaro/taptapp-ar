@@ -5,13 +5,14 @@ import { computeHomography } from "./ransacHomography.js";
 import { multiplyPointHomographyInhomogenous, matrixInverse33 } from "../utils/geometry.js";
 import { refineWithMorphology } from "../estimation/morph-refinement.js";
 import { popcount32 } from "./hierarchical-clustering.js";
+import { AR_CONFIG } from "../constants.js";
 
-const INLIER_THRESHOLD = 15.0; // 🚀 More tolerance for initial noise
-const MIN_NUM_INLIERS = 6;      // 🎯 Lowered from 8 to catch the marker earlier
-const CLUSTER_MAX_POP = 25;
-const HAMMING_THRESHOLD = 0.85;
-const HDC_RATIO_THRESHOLD = 0.85;
-const MAX_MATCH_QUERY_POINTS = 800; // 🚀 Increased to handle 3000+ points detected
+const INLIER_THRESHOLD = AR_CONFIG.INLIER_THRESHOLD;
+const MIN_NUM_INLIERS = AR_CONFIG.MIN_NUM_INLIERS;
+const CLUSTER_MAX_POP = AR_CONFIG.CLUSTER_MAX_POP;
+const HAMMING_THRESHOLD = AR_CONFIG.HAMMING_THRESHOLD;
+const HDC_RATIO_THRESHOLD = AR_CONFIG.HDC_RATIO_THRESHOLD;
+const MAX_MATCH_QUERY_POINTS = AR_CONFIG.MAX_MATCH_QUERY_POINTS;
 
 // match list of querpoints against pre-built list of keyframes
 const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight, debugMode }) => {
