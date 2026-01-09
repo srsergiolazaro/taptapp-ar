@@ -205,6 +205,10 @@ function handleARUpdate(data: any, markerW: number, markerH: number, controller:
         const { featurePoints } = data;
         if (featurePoints) {
             drawFeaturePoints(featurePoints);
+            // Log point count every few frames to avoid flood
+            if (Math.random() < 0.05) {
+                log(`FEAT: Detected ${featurePoints.length} points`);
+            }
         }
     }
 
@@ -218,9 +222,11 @@ function handleARUpdate(data: any, markerW: number, markerH: number, controller:
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
         }
 
+        /*
         if (deformedMesh) {
             drawMesh(deformedMesh);
         }
+        */
 
         // Smooth points regardless of tracking status (they show up when asoma)
         let smoothedCoords = screenCoords || [];
@@ -257,10 +263,10 @@ function handleARUpdate(data: any, markerW: number, markerH: number, controller:
             // Pose Verification Log (Reality vs AR)
             const f = controller.projectionTransform[0][0];
             const tz = modelViewTransform[2][3];
-            const estScale = (f / tz);
-
             if (Math.random() < 0.02) {
-                log(`VERIFICATION: SimScale: ${simScaleEl.textContent} | EstScale: ${estScale.toFixed(2)} | Rel: ${avgReliability.toFixed(2)}`);
+                const estScale = (f / tz);
+                const simScale = parseFloat(simScaleEl.textContent || "0");
+                log(`TRACK: Scale:${estScale.toFixed(3)} (ideal:${simScale.toFixed(3)}) | Err:${Math.abs(estScale - simScale).toFixed(4)}`);
             }
 
             // Position Overlay (SimpleAR logic)
@@ -271,9 +277,11 @@ function handleARUpdate(data: any, markerW: number, markerH: number, controller:
             overlay.style.display = 'none';
             arReliability.textContent = '0.00';
             arStability.textContent = '0.00';
-            // We don't reset all history immediately to allow for short "flickers"
-            // but if we want to be clean:
-            // smoother.reset(); 
+
+            // Log why we are searching (debugExtra might have info)
+            if (Math.random() < 0.02) {
+                log(`SEARCH: No target matched. Points detected: ${screenCoords?.length || 0}`);
+            }
         }
 
         // DRAW POINTS
@@ -435,10 +443,21 @@ function positionOverlay(mVT: number[][], markerW: number, markerH: number, cont
 
     const matrix = solveHomography(markerW, markerH, pUL, pUR, pLL, pLR);
 
+    // 🕵️ Debug Log for Overlay
+    if (Math.random() < 0.01) {
+        console.log("OVERLAY_DEBUG:", {
+            corners: { pUL, pUR, pLL, pLR },
+            matrix: matrix.map(v => v.toFixed(2)).join(','),
+            containerSize: { w: containerRect.width, h: containerRect.height }
+        });
+    }
+
     overlay.style.width = `${markerW}px`;
     overlay.style.height = `${markerH}px`;
     overlay.style.transformOrigin = '0 0';
     overlay.style.transform = `matrix3d(${matrix.join(',')})`;
+    overlay.style.border = '2px solid #00ffff'; // Force visibility
+    overlay.style.display = 'block';
 }
 
 init();

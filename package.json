@@ -52,7 +52,8 @@
         "build": "tsc",
         "prepublishOnly": "npm run build",
         "test": "vitest",
-        "test:react": "vite --port 4321 --open tests/react-test.html"
+        "test:react": "vite --port 4321 --open tests/reliability-test.html",
+        "test:pnp": "pnpm build && node scripts/pnp-verify-cli.js"
     },
     "peerDependencies": {
         "aframe": ">=1.5.0",

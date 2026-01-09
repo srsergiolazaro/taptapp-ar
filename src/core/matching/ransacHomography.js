@@ -11,8 +11,8 @@ import { solveHomography } from "../utils/homography.js";
 
 const CAUCHY_SCALE = 0.01;
 const CHUNK_SIZE = 10;
-const NUM_HYPOTHESES = 20;
-const NUM_HYPOTHESES_QUICK = 10;
+const NUM_HYPOTHESES = 100;
+const NUM_HYPOTHESES_QUICK = 50;
 
 // Using RANSAC to estimate homography
 const computeHomography = (options) => {
@@ -129,13 +129,10 @@ const computeHomography = (options) => {
 };
 
 const _checkHeuristics = ({ H, testPoints, keyframe }) => {
-  const HInv = matrixInverse33(H, 0.00001);
-  if (HInv === null) return false;
-
   const mp = [];
   for (let i = 0; i < testPoints.length; i++) {
     // 4 test points, corner of keyframe
-    mp.push(multiplyPointHomographyInhomogenous(testPoints[i], HInv));
+    mp.push(multiplyPointHomographyInhomogenous(testPoints[i], H));
   }
   const smallArea = smallestTriangleArea(mp[0], mp[1], mp[2], mp[3]);
 

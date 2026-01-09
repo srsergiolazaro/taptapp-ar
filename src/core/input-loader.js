@@ -38,14 +38,33 @@ class InputLoader {
 
       const isInputRotated = input.width === this.height && input.height === this.width;
 
+      const inputW = isInputRotated ? input.height : input.width;
+      const inputH = isInputRotated ? input.width : input.height;
+      const inputAspect = inputW / inputH;
+      const canvasAspect = this.width / this.height;
+
+      let sx = 0, sy = 0, sw = inputW, sh = inputH;
+
+      if (inputAspect > canvasAspect) {
+        // Input is wider than canvas - crop sides
+        sw = inputH * canvasAspect;
+        sx = (inputW - sw) / 2;
+      } else if (inputAspect < canvasAspect) {
+        // Input is taller than canvas - crop top/bottom
+        sh = inputW / canvasAspect;
+        sy = (inputH - sh) / 2;
+      }
+
       if (isInputRotated) {
         this.context.save();
         this.context.translate(this.width / 2, this.height / 2);
         this.context.rotate(Math.PI / 2);
-        this.context.drawImage(input, -input.width / 2, -input.height / 2);
+        // Map source crop (relative to rotated input)
+        // Since input is already rotated, we crop based on the rotated dimensions
+        this.context.drawImage(input, sx, sy, sw, sh, -this.height / 2, -this.width / 2, this.height, this.width);
         this.context.restore();
       } else {
-        this.context.drawImage(input, 0, 0, this.width, this.height);
+        this.context.drawImage(input, sx, sy, sw, sh, 0, 0, this.width, this.height);
       }
 
       const imageData = this.context.getImageData(0, 0, this.width, this.height);

@@ -9,36 +9,47 @@ class Matcher {
 
   matchDetection(keyframes, featurePoints) {
     let debugExtra = { frames: [] };
-
     let bestResult = null;
-    for (let i = 0; i < keyframes.length; i++) {
+
+    // keyframes is actually the matchingData array for a single target
+    if (!keyframes || !Array.isArray(keyframes)) {
+      return { targetIndex: -1, keyframeIndex: -1, debugExtra };
+    }
+
+    for (let j = 0; j < keyframes.length; j++) {
       const {
         H,
         matches,
         debugExtra: frameDebugExtra,
       } = match({
-        keyframe: keyframes[i],
+        keyframe: keyframes[j],
         querypoints: featurePoints,
         querywidth: this.queryWidth,
         queryheight: this.queryHeight,
         debugMode: this.debugMode,
       });
-      debugExtra.frames.push(frameDebugExtra);
+
+      if (frameDebugExtra) {
+        frameDebugExtra.keyframeIndex = j;
+        debugExtra.frames.push(frameDebugExtra);
+      }
 
       if (H) {
         if (bestResult === null || bestResult.matches.length < matches.length) {
-          bestResult = { keyframeIndex: i, H, matches };
+          bestResult = { keyframeIndex: j, H, matches };
         }
       }
     }
 
     if (bestResult === null) {
-      return { keyframeIndex: -1, debugExtra };
+      return { targetIndex: -1, keyframeIndex: -1, debugExtra };
     }
 
     const screenCoords = [];
     const worldCoords = [];
     const keyframe = keyframes[bestResult.keyframeIndex];
+    const scale = keyframe.s || keyframe.scale || 1.0;
+
     for (let i = 0; i < bestResult.matches.length; i++) {
       const querypoint = bestResult.matches[i].querypoint;
       const keypoint = bestResult.matches[i].keypoint;
@@ -47,12 +58,19 @@ class Matcher {
         y: querypoint.y,
       });
       worldCoords.push({
-        x: (keypoint.x + 0.5) / (keyframe.s || keyframe.scale || 1.0),
-        y: (keypoint.y + 0.5) / (keyframe.s || keyframe.scale || 1.0),
+        x: (keypoint.x + 0.5) / scale,
+        y: (keypoint.y + 0.5) / scale,
         z: 0,
       });
     }
-    return { screenCoords, worldCoords, keyframeIndex: bestResult.keyframeIndex, debugExtra };
+    return {
+      screenCoords,
+      worldCoords,
+      targetIndex: -1, // Caller knows the targetIndex
+      keyframeIndex: bestResult.keyframeIndex,
+      H: bestResult.H,
+      debugExtra
+    };
   }
 }
 

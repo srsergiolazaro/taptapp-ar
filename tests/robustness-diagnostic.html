@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Deep Diagnostic Tool</title>
+    <style>
+        body {
+            background: #0f0f12;
+            color: #e0e0e0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: #1a1a20;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            image-rendering: pixelated;
+            background: #000;
+            border-radius: 8px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        select,
+        button {
+            background: #2a2a30;
+            color: white;
+            border: 1px solid #444;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .log-box {
+            background: #000;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: #10b981;
+        }
+
+        .octave-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .octave-item {
+            text-align: center;
+            font-size: 10px;
+        }
+
+        .octave-item canvas {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>AR Engine Deep Diagnostic</h1>
+
+    <div class="controls">
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        <button onclick="document.getElementById('fileInput').click()">1. Upload Test Image</button>
+
+        <input type="file" id="taarInput" accept=".taar" style="display: none;">
+        <button onclick="document.getElementById('taarInput').click()" style="background: #4338ca;">2. Load .taar
+            Configuration</button>
+
+        <select id="octaveSelect">
+            <option value="all">View All Octaves</option>
+            <option value="0">Octave 0</option>
+            <option value="1">Octave 1</option>
+            <option value="2">Octave 2</option>
+        </select>
+        <button id="btnRun" style="background: #10b981;">3. Run Deep Diagnostic</button>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Input & Matching Analysis</h2>
+            <div id="mainCanvasContainer" style="position: relative; line-height: 0;">
+                <canvas id="mainCanvas"></canvas>
+                <canvas id="overlayCanvas" style="position: absolute; top:0; left:0; pointer-events:none;"></canvas>
+            </div>
+
+            <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="log-box" id="diagnosticLogs">Ready. Upload image and .taar...</div>
+                <div class="card" style="padding: 10px; margin: 0; background: #000; font-size: 12px;">
+                    <h3 style="margin-top:0; color: #4f46e5;">Matching Stats</h3>
+                    <div id="matchStats">
+                        Target: <span id="statTarget">None</span><br>
+                        Matches Found: <span id="statMatches">0</span><br>
+                        Inliers (Valid): <span id="statInliers">0</span><br>
+                        Confidence: <span id="statConf">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>DoG Pyramid (Difference of Gaussians)</h2>
+            <div id="pyramidContainer" class="octave-view">
+                <!-- Canvases will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./diagnostic-app.ts"></script>
+</body>
+
+</html>

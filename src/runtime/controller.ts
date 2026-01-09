@@ -102,7 +102,10 @@ class Controller {
         if (this.worker) this._setupWorkerListener();
 
         // Moonshot: Full frame detector for better sensitivity
-        this.fullDetector = new DetectorLite(this.inputWidth, this.inputHeight, { useLSH: true });
+        this.fullDetector = new DetectorLite(this.inputWidth, this.inputHeight, {
+            useLSH: true,
+            maxFeaturesPerBucket: 24 // Increased from 12 for better small target density
+        });
 
         this.featureManager.init({
             inputWidth: this.inputWidth,
@@ -111,9 +114,9 @@ class Controller {
             debugMode: this.debugMode
         });
 
-        const near = 10;
-        const far = 100000;
-        const fovy = (45.0 * Math.PI) / 180;
+        const near = 1.0;
+        const far = 10000;
+        const fovy = (60.0 * Math.PI) / 180;
         const f = this.inputHeight / 2 / Math.tan(fovy / 2);
 
         this.projectionTransform = [
@@ -323,10 +326,12 @@ class Controller {
             }
         }
 
-        // STRICT QUALITY CHECK: We only update the transform if we have enough HIGH CONFIDENCE points
-        const stableAndReliable = reliabilities.filter((r: number, idx: number) => r > 0.8 && stabilities[indices[idx]] > 0.6).length;
+        // 🚀 WARMUP FIX: If we just started tracking (less than 15 frames), we are much more relaxed
+        const isWarmup = state.trackCount < 15;
+        const numTracked = finalWorldCoords.length;
+        const minPoints = isWarmup ? 4 : 5; // Start with 4, then require 5
 
-        if (stableAndReliable < 6 || finalWorldCoords.length < 8) {
+        if (numTracked < minPoints) {
             return {
                 modelViewTransform: null,
                 screenCoords: finalScreenCoords,
@@ -334,6 +339,8 @@ class Controller {
                 stabilities: finalStabilities
             };
         }
+
+        state.trackCount++;
 
         const modelViewTransform = await this._workerTrackUpdate(lastModelViewTransform, {
             worldCoords: finalWorldCoords,
@@ -670,15 +677,14 @@ class Controller {
     }
 
     _glModelViewMatrix(modelViewTransform: number[][], targetIndex: number) {
-        const height = this.markerDimensions![targetIndex][1];
+        // Transformation to map Computer Vision coordinates (Y-down, Z-forward) 
+        // to OpenGL coordinates (Y-up, Z-backward). 
+        // We negate the 2nd and 3rd rows of the pose matrix.
         return [
             modelViewTransform[0][0], -modelViewTransform[1][0], -modelViewTransform[2][0], 0,
-            -modelViewTransform[0][1], modelViewTransform[1][1], modelViewTransform[2][1], 0,
-            -modelViewTransform[0][2], modelViewTransform[1][2], modelViewTransform[2][2], 0,
-            modelViewTransform[0][1] * height + modelViewTransform[0][3],
-            -(modelViewTransform[1][1] * height + modelViewTransform[1][3]),
-            -(modelViewTransform[2][1] * height + modelViewTransform[2][3]),
-            1,
+            modelViewTransform[0][1], -modelViewTransform[1][1], -modelViewTransform[2][1], 0,
+            modelViewTransform[0][2], -modelViewTransform[1][2], -modelViewTransform[2][2], 0,
+            modelViewTransform[0][3], -modelViewTransform[1][3], -modelViewTransform[2][3], 1,
         ];
     }
 

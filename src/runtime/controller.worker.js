@@ -31,7 +31,10 @@ onmessage = (msg) => {
         );
       }
 
-      detector = new DetectorLite(data.inputWidth, data.inputHeight, { useLSH: true });
+      detector = new DetectorLite(data.inputWidth, data.inputHeight, {
+        useLSH: true,
+        maxFeaturesPerBucket: 24
+      });
       break;
 
     case "match":

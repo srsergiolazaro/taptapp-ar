@@ -99,21 +99,24 @@ Our DetectorLite implementation follows a 6-stage pipeline:
 We construct an octave-based pyramid using a separable 5-tap binomial filter with weights $[1, 4, 6, 4, 1] / 16$. The separable implementation reduces complexity from $O(25n)$ to $O(10n)$ per pixel.
 
 \begin{algorithm}
-\caption{Optimized Separable Gaussian Filter}
+\caption{Optimized Separable Gaussian Filter with Border Normalization}
 \begin{algorithmic}[1]
 \State \textbf{Input:} Image $I$, dimensions $W \times H$
 \State \textbf{Output:} Filtered image $G$
 \State $k \gets [1/16, 4/16, 6/16, 4/16, 1/16]$
 \State $T \gets \text{Float32Array}(W \times H)$
 \For{$y \gets 0$ to $H-1$}
-    \State $r \gets y \times W$ \Comment{Pre-compute row offset}
+    \State $r \gets y \times W$
     \For{$x \gets 0$ to $W-1$}
-        \State $T[r+x] \gets$ \Call{HorizontalConvolve}{$I, x, r, k$}
+        \State $S \gets \text{sum of weights in window}$
+        \State $T[r+x] \gets \frac{1}{S} \sum_{i=-2}^{2} I[r+x+i] \cdot k[i+2]$
     \EndFor
 \EndFor
-\State \Return \Call{VerticalPass}{$T, k$}
+\State \Return \Call{VerticalPassNormalized}{$T, k$}
 \end{algorithmic}
 \end{algorithm}
+
+\paragraph{Border Normalization:} A discovered issue in traditional separable filters is the "energy loss" at image boundaries, where only 68\% of the kernel energy is captured. We implemented an on-the-fly normalization $G' = G \cdot (1/\sum w)$ to ensure constant intensity across the entire frame, eliminating false feature detection at target edges.
 
 Key optimizations include:
 \begin{itemize}
@@ -169,7 +172,15 @@ A critical limitation of point-based tracking is the failure to maintain spatial
 
 During matching, we perform a \textbf{Harmonic Consistency Check}. For a query point projected via a predicted homography $H$, we verify if its position matches the stored Fourier signature. This ensures that matched points are not just visually similar, but spatially consistent with the expected geometric flow.
 
-\subsubsection{Stage 9: Non-Rigid Mesh Refinement}
+\subsubsection{Stage 9: Coordinate Consistency \& Multi-Octave Restoration}
+
+A critical bug was identified in previous iterations where features detected in downsampled image octaves were incorrectly scaled. For a feature detected in octave $s$, its keyframe coordinates $(x_s, y_s)$ must be mapped back to the world space $(x_w, y_w)$ via division by the octave scale:
+
+\begin{equation}
+(x_w, y_w) = \frac{(x_s + 0.5)}{2^s}
+\end{equation}
+
+Our corrected implementation ensures that the PnP solver receives sub-pixel coordinates relative to the original image dimensions, enabling stable tracking even for targets occupying less than 5\% of the camera view.
 
 To support non-planar surfaces (e.g., curved banners, clothing), we replace the rigid homography constraint with a \textbf{Deformable Delaunay Mesh}. 
 

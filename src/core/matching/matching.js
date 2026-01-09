@@ -3,21 +3,33 @@ import { compute as hammingCompute } from "./hamming-distance.js";
 import { computeHoughMatches } from "./hough.js";
 import { computeHomography } from "./ransacHomography.js";
 import { multiplyPointHomographyInhomogenous, matrixInverse33 } from "../utils/geometry.js";
+import { refineWithMorphology } from "../estimation/morph-refinement.js";
+import { popcount32 } from "./hierarchical-clustering.js";
 
-const INLIER_THRESHOLD = 5.0; // Tightened from 10 to 5 for better precision
-const MIN_NUM_INLIERS = 8;  // Restored to 8
-const CLUSTER_MAX_POP = 20;
-const HAMMING_THRESHOLD = 0.85; // Relaxed from 0.8 back to 0.85
+const INLIER_THRESHOLD = 15.0; // 🚀 More tolerance for initial noise
+const MIN_NUM_INLIERS = 6;      // 🎯 Lowered from 8 to catch the marker earlier
+const CLUSTER_MAX_POP = 25;
+const HAMMING_THRESHOLD = 0.85;
+const HDC_RATIO_THRESHOLD = 0.85;
+const MAX_MATCH_QUERY_POINTS = 800; // 🚀 Increased to handle 3000+ points detected
 
 // match list of querpoints against pre-built list of keyframes
-const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) => {
+const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight, debugMode }) => {
   let debugExtra = {};
+
+  // 🎯 Performance Optimizer: Use only the most "salient" points (highest response)
+  const querypoints = rawQuerypoints.length > MAX_MATCH_QUERY_POINTS
+    ? [...rawQuerypoints].sort((a, b) => (b.score || b.response || 0) - (a.score || a.response || 0)).slice(0, MAX_MATCH_QUERY_POINTS)
+    : rawQuerypoints;
 
   const matches = [];
   const qlen = querypoints.length;
   const kmax = keyframe.max;
   const kmin = keyframe.min;
-  const descSize = 2; // Protocol V6: 64-bit LSH (2 x 32-bit)
+  const isHDC = keyframe.hdc === true || (kmax && kmax.hdc === 1);
+  const descSize = isHDC ? 1 : 2;
+
+  const currentRatioThreshold = isHDC ? HDC_RATIO_THRESHOLD : HAMMING_THRESHOLD;
 
   for (let j = 0; j < qlen; j++) {
     const querypoint = querypoints[j];
@@ -28,14 +40,15 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
     const keypointIndexes = [];
     const queue = new TinyQueue([], (a1, a2) => a1.d - a2.d);
 
-    // query potential candidates from the columnar tree
     _query({
       node: rootNode,
       descriptors: col.d,
       querypoint,
       queue,
       keypointIndexes,
-      numPop: 0
+      numPop: 0,
+      isHDC,
+      descSize
     });
 
     let bestIndex = -1;
@@ -48,8 +61,12 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
     for (let k = 0; k < keypointIndexes.length; k++) {
       const idx = keypointIndexes[k];
 
-      // Use offsets based on detected descriptor size
-      const d = hammingCompute({ v1: cDesc, v1Offset: idx * descSize, v2: qDesc });
+      let d;
+      if (isHDC) {
+        d = popcount32(cDesc[idx] ^ querypoint.hdcSignature);
+      } else {
+        d = hammingCompute({ v1: cDesc, v1Offset: idx * descSize, v2: qDesc });
+      }
 
       if (d < bestD1) {
         bestD2 = bestD1;
@@ -61,7 +78,7 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
     }
 
     if (bestIndex !== -1) {
-      if (bestD2 === Number.MAX_SAFE_INTEGER || (bestD1 / bestD2) < HAMMING_THRESHOLD) {
+      if (bestD2 === Number.MAX_SAFE_INTEGER || (bestD1 / bestD2) < currentRatioThreshold) {
         matches.push({
           querypoint,
           keypoint: {
@@ -69,28 +86,45 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
             y: col.y[bestIndex],
             angle: col.a[bestIndex],
             scale: col.s ? col.s[bestIndex] : keyframe.s
-          }
+          },
+          d: bestD1
         });
       }
     }
   }
 
-  if (matches.length < MIN_NUM_INLIERS) return { debugExtra };
+
+  if (matches.length < MIN_NUM_INLIERS) {
+    return { debugExtra };
+  }
+
+  // Debug: Log Hamming results
+  if (Math.random() < 0.1 && debugMode) {
+    console.log(`MATCH_DL: Hamming found ${matches.length} initial matches`);
+  }
+
+  // 🌌 Moonshot: Constellation matching disabled for performance calibration
+  const constellationMatches = matches;
+  if (debugMode) debugExtra.constellationMatches = constellationMatches;
 
   const houghMatches = computeHoughMatches({
-    keywidth: keyframe.w,
-    keyheight: keyframe.h,
+    keywidth: keyframe.w || keyframe.width,
+    keyheight: keyframe.h || keyframe.height,
     querywidth,
     queryheight,
-    matches,
+    matches: constellationMatches,
   });
 
   if (debugMode) debugExtra.houghMatches = houghMatches;
 
+  if (houghMatches.length < MIN_NUM_INLIERS) {
+    return { debugExtra };
+  }
+
   const H = computeHomography({
     srcPoints: houghMatches.map((m) => [m.keypoint.x, m.keypoint.y]),
     dstPoints: houghMatches.map((m) => [m.querypoint.x, m.querypoint.y]),
-    keyframe: { width: keyframe.w, height: keyframe.h },
+    keyframe: { width: keyframe.w || keyframe.width, height: keyframe.h || keyframe.height },
   });
 
   if (H === null) {
@@ -104,11 +138,17 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
   });
 
   if (debugMode) debugExtra.inlierMatches = inlierMatches;
-  if (inlierMatches.length < MIN_NUM_INLIERS) return { debugExtra };
+  if (inlierMatches.length < MIN_NUM_INLIERS) {
+    return { debugExtra };
+  }
 
-  // Second pass with homography guided matching
+  if (debugMode && Math.random() < 0.02) {
+    console.log(`MATCH: Homography success with ${inlierMatches.length} inliers`);
+  }
+
+
   const HInv = matrixInverse33(H, 0.00001);
-  const dThreshold2 = 100; // 10 * 10
+  const dThreshold2 = 100;
   const matches2 = [];
 
   const hi00 = HInv[0], hi01 = HInv[1], hi02 = HInv[2];
@@ -119,7 +159,6 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
     const querypoint = querypoints[j];
     const qx = querypoint.x, qy = querypoint.y;
 
-    // Inline multiplyPointHomographyInhomogenous
     const uz = (qx * hi20) + (qy * hi21) + hi22;
     const invZ = 1.0 / uz;
     const mapX = ((qx * hi00) + (qy * hi01) + hi02) * invZ;
@@ -142,7 +181,12 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
 
       if (d2 > dThreshold2) continue;
 
-      const d = hammingCompute({ v1: cd, v1Offset: k * descSize, v2: qDesc });
+      let d;
+      if (isHDC) {
+        d = popcount32(cd[k] ^ querypoint.hdcSignature);
+      } else {
+        d = hammingCompute({ v1: cd, v1Offset: k * descSize, v2: qDesc });
+      }
 
       if (d < bestD1) {
         bestD2 = bestD1;
@@ -155,7 +199,7 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
 
     if (
       bestIndex !== -1 &&
-      (bestD2 === Number.MAX_SAFE_INTEGER || (bestD1 / bestD2) < HAMMING_THRESHOLD)
+      (bestD2 === Number.MAX_SAFE_INTEGER || (bestD1 / bestD2) < currentRatioThreshold)
     ) {
       matches2.push({
         querypoint,
@@ -172,8 +216,8 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
   if (debugMode) debugExtra.matches2 = matches2;
 
   const houghMatches2 = computeHoughMatches({
-    keywidth: keyframe.w,
-    keyheight: keyframe.h,
+    keywidth: keyframe.w || keyframe.width,
+    keyheight: keyframe.h || keyframe.height,
     querywidth,
     queryheight,
     matches: matches2,
@@ -184,7 +228,7 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
   const H2 = computeHomography({
     srcPoints: houghMatches2.map((m) => [m.keypoint.x, m.keypoint.y]),
     dstPoints: houghMatches2.map((m) => [m.querypoint.x, m.querypoint.y]),
-    keyframe: { width: keyframe.w, height: keyframe.h },
+    keyframe: { width: keyframe.w || keyframe.width, height: keyframe.h || keyframe.height },
   });
 
   if (H2 === null) return { debugExtra };
@@ -197,11 +241,19 @@ const match = ({ keyframe, querypoints, querywidth, queryheight, debugMode }) =>
 
   if (debugMode) debugExtra.inlierMatches2 = inlierMatches2;
 
-  return { H: H2, matches: inlierMatches2, debugExtra };
+  const refinedH = refineWithMorphology({
+    imageData: rawQuerypoints[0].imageData,
+    width: querywidth,
+    height: queryheight,
+    targetData: { w: keyframe.w || keyframe.width, h: keyframe.h || keyframe.height },
+    initialH: H2,
+    iterations: 3
+  });
+
+  return { H: refinedH || H2, matches: inlierMatches2, debugExtra };
 };
 
-const _query = ({ node, descriptors, querypoint, queue, keypointIndexes, numPop }) => {
-  const descSize = 2;
+const _query = ({ node, descriptors, querypoint, queue, keypointIndexes, numPop, isHDC, descSize }) => {
   const isLeaf = node[0] === 1;
   const childrenOrIndices = node[2];
 
@@ -221,27 +273,32 @@ const _query = ({ node, descriptors, querypoint, queue, keypointIndexes, numPop 
     const childNode = childrenOrIndices[i];
     const cIdx = childNode[1];
 
-    const d = hammingCompute({
-      v1: descriptors,
-      v1Offset: cIdx * descSize,
-      v2: qDesc,
-    });
+    let d;
+    if (isHDC) {
+      d = popcount32(descriptors[cIdx] ^ querypoint.hdcSignature);
+    } else {
+      d = hammingCompute({
+        v1: descriptors,
+        v1Offset: cIdx * descSize,
+        v2: qDesc,
+      });
+    }
     distances[i] = d;
     if (d < minD) minD = d;
   }
 
   for (let i = 0; i < clen; i++) {
     const dist = distances[i];
-    if (dist !== minD) {
-      queue.push({ node: childrenOrIndices[i], d: dist });
+    if (dist <= minD) {
+      _query({ node: childrenOrIndices[i], descriptors, querypoint, queue, keypointIndexes, numPop: numPop + 1, isHDC, descSize });
     } else {
-      _query({ node: childrenOrIndices[i], descriptors, querypoint, queue, keypointIndexes, numPop: numPop + 1 });
+      queue.push({ node: childrenOrIndices[i], d: dist });
     }
   }
 
   if (numPop < CLUSTER_MAX_POP && queue.length > 0) {
     const { node } = queue.pop();
-    _query({ node, descriptors, querypoint, queue, keypointIndexes, numPop: numPop + 1 });
+    _query({ node, descriptors, querypoint, queue, keypointIndexes, numPop: numPop + 1, isHDC, descSize });
   }
 };
 
@@ -259,7 +316,6 @@ const _findInlierMatches = (options) => {
     const qp = m.querypoint;
     const kp = m.keypoint;
 
-    // Inline multiplyPointHomographyInhomogenous
     const uz = (kp.x * h20) + (kp.y * h21) + h22;
     const invZ = 1.0 / uz;
     const mx = ((kp.x * h00) + (kp.y * h01) + h02) * invZ;
@@ -272,6 +328,103 @@ const _findInlierMatches = (options) => {
     }
   }
   return goodMatches;
+};
+
+const _applyConstellationFilter = (matches) => {
+  const len = matches.length;
+  if (len < 3) return matches;
+
+  const pool = matches.slice().sort((a, b) => a.d - b.d).slice(0, 1500);
+
+  const RATIO_TOLERANCE = 0.25;
+  const COSINE_TOLERANCE = 0.2;
+  const MAX_NEIGHBORS = 6;
+  const MIN_VERIFICATIONS = 1;
+
+  const gridSize = 50;
+  const grid = new Map();
+  const getGridKey = (x, y) => `${Math.floor(x / gridSize)},${Math.floor(y / gridSize)}`;
+
+  for (let i = 0; i < pool.length; i++) {
+    const qp = pool[i].querypoint;
+    const key = getGridKey(qp.x, qp.y);
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(i);
+  }
+
+  const scores = new Int32Array(pool.length);
+
+  for (let i = 0; i < pool.length; i++) {
+    const m1 = pool[i];
+    const qp1 = m1.querypoint;
+
+    const neighbors = [];
+    const gx = Math.floor(qp1.x / gridSize);
+    const gy = Math.floor(qp1.y / gridSize);
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const cell = grid.get(`${gx + dx},${gy + dy}`);
+        if (!cell) continue;
+        for (const idx of cell) {
+          if (idx === i) continue;
+          const m2 = pool[idx];
+          const distSq = Math.pow(m2.querypoint.x - qp1.x, 2) + Math.pow(m2.querypoint.y - qp1.y, 2);
+          neighbors.push({ index: idx, d2: distSq });
+        }
+      }
+    }
+  }
+
+  const filtered = [];
+  // Dummy logic just to keep the structure
+  for (let i = 0; i < pool.length; i++) {
+    filtered.push(pool[i]);
+  }
+  return filtered;
+};
+
+const _checkTriadConsistency = (m1, m2, m3, ratioTol, cosTol) => {
+  const q1x = m1.querypoint.x, q1y = m1.querypoint.y;
+  const q2x = m2.querypoint.x, q2y = m2.querypoint.y;
+  const q3x = m3.querypoint.x, q3y = m3.querypoint.y;
+
+  const v21q = [q2x - q1x, q2y - q1y];
+  const v31q = [q3x - q1x, q3y - q1y];
+
+  const k1x = m1.keypoint.x, k1y = m1.keypoint.y;
+  const k2x = m2.keypoint.x, k2y = m2.keypoint.y;
+  const k3x = m3.keypoint.x, k3y = m3.keypoint.y;
+
+  const v21k = [k2x - k1x, k2y - k1y];
+  const v31k = [k3x - k1x, k3y - k1y];
+
+  const d21q2 = v21q[0] * v21q[0] + v21q[1] * v21q[1];
+  const d31q2 = v31q[0] * v31q[0] + v31q[1] * v31q[1];
+  const d21k2 = v21k[0] * v21k[0] + v21k[1] * v21k[1];
+  const d31k2 = v31k[0] * v31k[0] + v31k[1] * v31k[1];
+
+  if (d31q2 < 1e-4 || d31k2 < 1e-4) return false;
+
+  const ratioQ = d21q2 / d31q2;
+  const ratioK = d21k2 / d31k2;
+
+  if (Math.abs(ratioQ - ratioK) / (ratioK + 1e-6) > ratioTol * 2) return false;
+
+  const dotQ = v21q[0] * v31q[0] + v21q[1] * v31q[1];
+  const cosQ = dotQ / Math.sqrt(d21q2 * d31q2);
+
+  const dotK = v21k[0] * v31k[0] + v21k[1] * v31k[1];
+  const cosK = dotK / Math.sqrt(d21k2 * d31k2);
+
+  if (Math.abs(cosQ - cosK) > cosTol) return false;
+
+  const crossQ = v21q[0] * v31q[1] - v21q[1] * v31q[0];
+  const crossK = v21k[0] * v31k[1] - v21k[1] * v31k[0];
+
+  if ((crossQ > 0) !== (crossK > 0)) return false;
+
+  return true;
 };
 
 export { match };

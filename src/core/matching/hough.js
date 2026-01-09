@@ -9,9 +9,9 @@ const computeHoughMatches = (options) => {
   const maxY = queryheight * 1.2;
   const minY = -maxY;
   const numAngleBins = 12;
-  const numScaleBins = 10;
-  const minScale = -1;
-  const maxScale = 1;
+  const numScaleBins = 12; // 🚀 Increased bins
+  const minScale = -2; // 📐 Support 1% scale (10^-2)
+  const maxScale = 1;  // 📐 Support 1000% scale (10^1)
   const scaleK = 10.0;
   const scaleOneOverLogK = 1.0 / Math.log(scaleK);
   const maxDim = Math.max(keywidth, keyheight);
@@ -38,9 +38,9 @@ const computeHoughMatches = (options) => {
     Math.floor(projectedDims.length / 2) - (projectedDims.length % 2 == 0 ? 1 : 0) - 1
     ];
 
-  const binSize = 0.25 * medianProjectedDim;
-  const numXBins = Math.max(5, Math.ceil((maxX - minX) / binSize));
-  const numYBins = Math.max(5, Math.ceil((maxY - minY) / binSize));
+  const binSize = Math.max(20, 0.25 * medianProjectedDim); // 🚀 Ensure bins aren't too small for noise
+  const numXBins = Math.max(5, Math.min(40, Math.ceil((maxX - minX) / binSize))); // 🎯 Cap bins to keep voting dense
+  const numYBins = Math.max(5, Math.min(40, Math.ceil((maxY - minY) / binSize)));
 
   const numXYBins = numXBins * numYBins;
   const numXYAngleBins = numXYBins * numAngleBins;
@@ -152,26 +152,27 @@ const computeHoughMatches = (options) => {
     (maxVoteIndex - binX - binY * numXBins - binAngle * numXYBins) / numXYAngleBins,
   );
 
-  //console.log("hough voted: ", {binX, binY, binAngle, binScale, maxVoteIndex});
+  // console.log(`[Hough] Peak votes: ${maxVotes} out of ${matches.length} matches.`);
 
   const houghMatches = [];
+  const relaxedDelta = 2.0; // 🚀 Increased for better cluster robustness
   for (let i = 0; i < matches.length; i++) {
     if (!querypointValids[i]) continue;
 
     const queryBins = querypointBinLocations[i];
     // compute bin difference
     const distBinX = Math.abs(queryBins.binX - (binX + 0.5));
-    if (distBinX >= kHoughBinDelta) continue;
+    if (distBinX >= relaxedDelta) continue;
 
     const distBinY = Math.abs(queryBins.binY - (binY + 0.5));
-    if (distBinY >= kHoughBinDelta) continue;
+    if (distBinY >= relaxedDelta) continue;
 
     const distBinScale = Math.abs(queryBins.binScale - (binScale + 0.5));
-    if (distBinScale >= kHoughBinDelta) continue;
+    if (distBinScale >= relaxedDelta) continue;
 
     const temp = Math.abs(queryBins.binAngle - (binAngle + 0.5));
     const distBinAngle = Math.min(temp, numAngleBins - temp);
-    if (distBinAngle >= kHoughBinDelta) continue;
+    if (distBinAngle >= relaxedDelta) continue;
 
     houghMatches.push(matches[i]);
   }

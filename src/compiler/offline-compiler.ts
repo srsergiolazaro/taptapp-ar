@@ -12,6 +12,7 @@ import { DetectorLite } from "../core/detector/detector-lite.js";
 import { build as hierarchicalClusteringBuild } from "../core/matching/hierarchical-clustering.js";
 import * as protocol from "../core/protocol.js";
 import { triangulate, getEdges } from "../core/utils/delaunay.js";
+import { generateBasis, projectDescriptor, compressToSignature } from "../core/matching/hdc.js";
 
 // Detect environment
 const isNode = typeof process !== "undefined" &&
@@ -92,14 +93,25 @@ export class OfflineCompiler {
         const results = [];
         for (let i = 0; i < targetImages.length; i++) {
             const targetImage = targetImages[i];
-            const imageList = buildImageList(targetImage);
+            const fullImageList = buildImageList(targetImage);
+            // 🚀 MOONSHOT: Keep many scales for better robustness
+            const imageList = fullImageList;
             const percentPerImageScale = percentPerImage / imageList.length;
 
             const keyframes = [];
 
             for (const image of imageList as any[]) {
-                const detector = new DetectorLite(image.width, image.height, { useLSH: true, maxFeaturesPerBucket: 20 });
+                const detector = new DetectorLite(image.width, image.height, { useLSH: true, maxFeaturesPerBucket: 40 });
                 const { featurePoints: ps } = detector.detect(image.data);
+
+                // HDC Pre-calculation
+                const hdcBasis = generateBasis(protocol.HDC_SEED, 1024);
+                for (const p of ps) {
+                    if (p.descriptors) {
+                        const hv = projectDescriptor(p.descriptors, hdcBasis);
+                        p.hdcSignature = compressToSignature(hv);
+                    }
+                }
 
                 const maximaPoints = ps.filter((p: any) => p.maxima);
                 const minimaPoints = ps.filter((p: any) => !p.maxima);
@@ -204,8 +216,9 @@ export class OfflineCompiler {
                     w: kf.width,
                     h: kf.height,
                     s: kf.scale,
-                    max: protocol.columnarize(kf.maximaPoints, kf.maximaPointsCluster, kf.width, kf.height),
-                    min: protocol.columnarize(kf.minimaPoints, kf.minimaPointsCluster, kf.width, kf.height),
+                    hdc: false,
+                    max: protocol.columnarize(kf.maximaPoints, kf.maximaPointsCluster, kf.width, kf.height, false),
+                    min: protocol.columnarize(kf.minimaPoints, kf.minimaPointsCluster, kf.width, kf.height, false),
                 })),
             };
         });

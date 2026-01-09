@@ -13,13 +13,15 @@
 import { FREAKPOINTS } from "./freak.js";
 import { gpuCompute } from "../utils/gpu-compute.js";
 import { computeLSH64, computeFullFREAK, packLSHIntoDescriptor } from "../utils/lsh-direct.js";
+import { generateBasis, projectDescriptor, compressToSignature } from "../matching/hdc.js";
+import { HDC_SEED } from "../protocol.js";
 
 const PYRAMID_MIN_SIZE = 4; // Restored to 4 for better small-scale detection
 // PYRAMID_MAX_OCTAVE ya no es necesario, el límite lo da PYRAMID_MIN_SIZE
 
 
-const NUM_BUCKETS_PER_DIMENSION = 10;
-const DEFAULT_MAX_FEATURES_PER_BUCKET = 8;
+const NUM_BUCKETS_PER_DIMENSION = 15; // Increased from 10 to 15 for better local detail
+const DEFAULT_MAX_FEATURES_PER_BUCKET = 12; // Increased from 8 to 12
 
 
 const ORIENTATION_NUM_BINS = 36;
@@ -46,6 +48,7 @@ export class DetectorLite {
         this.useGPU = options.useGPU !== undefined ? options.useGPU : globalUseGPU;
         // Protocol V6 (Moonshot): 64-bit LSH is the standard descriptor format
         this.useLSH = options.useLSH !== undefined ? options.useLSH : true;
+        this.useHDC = options.useHDC !== undefined ? options.useHDC : true; // Enabled by default for Moonshot
         this.maxFeaturesPerBucket = options.maxFeaturesPerBucket !== undefined ? options.maxFeaturesPerBucket : DEFAULT_MAX_FEATURES_PER_BUCKET;
 
         let numOctaves = 0;
@@ -96,6 +99,17 @@ export class DetectorLite {
         // 6. Calcular descriptores FREAK
         this._computeFreakDescriptors(prunedExtremas, pyramidImages);
 
+        // 7. 🚀 MOONSHOT: HDC Hyper-projection
+        if (this.useHDC) {
+            const hdcBasis = generateBasis(HDC_SEED, 1024);
+            for (const ext of prunedExtremas) {
+                if (ext.lsh) {
+                    const hv = projectDescriptor(ext.lsh, hdcBasis);
+                    ext.hdcSignature = compressToSignature(hv);
+                }
+            }
+        }
+
         // Convertir a formato de salida
         const featurePoints = prunedExtremas.map(ext => {
             const scale = Math.pow(2, ext.octave);
@@ -105,7 +119,9 @@ export class DetectorLite {
                 y: ext.y * scale + scale * 0.5 - 0.5,
                 scale: scale,
                 angle: ext.angle || 0,
-                descriptors: (this.useLSH && ext.lsh) ? ext.lsh : (ext.descriptors || [])
+                descriptors: (this.useLSH && ext.lsh) ? ext.lsh : (ext.descriptors || []),
+                hdcSignature: ext.hdcSignature || 0,
+                imageData: data // Pass source image for refinement
             };
         });
 
@@ -182,9 +198,10 @@ export class DetectorLite {
         for (let y = 0; y < height; y++) {
             const rowOffset = y * width;
 
-            // Left border
-            temp[rowOffset] = data[rowOffset] * (k0 + k1 + k2) + data[rowOffset + 1] * k1 + data[rowOffset + 2] * k0;
-            temp[rowOffset + 1] = data[rowOffset] * k1 + data[rowOffset + 1] * k2 + data[rowOffset + 2] * k1 + data[rowOffset + 3] * k0;
+            // Left border (Normalized)
+            const sumL0 = k0 + k1 + k2 + k1 + k0; // Ideal sum
+            temp[rowOffset] = (data[rowOffset] * (k0 + k1 + k2) + data[rowOffset + 1] * k1 + data[rowOffset + 2] * k0) * (1.0 / (k0 + k1 + k2));
+            temp[rowOffset + 1] = (data[rowOffset] * k1 + data[rowOffset + 1] * k2 + data[rowOffset + 2] * k1 + data[rowOffset + 3] * k0) * (1.0 / (k1 + k2 + k1 + k0));
 
             // Main loop - NO boundary checks
             for (let x = 2; x < width - 2; x++) {
@@ -192,18 +209,18 @@ export class DetectorLite {
                 temp[pos] = data[pos - 2] * k0 + data[pos - 1] * k1 + data[pos] * k2 + data[pos + 1] * k1 + data[pos + 2] * k0;
             }
 
-            // Right border
+            // Right border (Normalized)
             const r2 = rowOffset + width - 2;
             const r1 = rowOffset + width - 1;
-            temp[r2] = data[r2 - 2] * k0 + data[r2 - 1] * k1 + data[r2] * k2 + data[r1] * k1;
-            temp[r1] = data[r1 - 2] * k0 + data[r1 - 1] * k1 + data[r1] * (k2 + k1 + k0);
+            temp[r2] = (data[r2 - 2] * k0 + data[r2 - 1] * k1 + data[r2] * k2 + data[r1] * k1) * (1.0 / (k0 + k1 + k2 + k1));
+            temp[r1] = (data[r1 - 2] * k0 + data[r1 - 1] * k1 + data[r1] * (k2 + k1 + k0)) * (1.0 / (k0 + k1 + k2));
         }
 
         // Vertical pass - Speed optimized
         for (let x = 0; x < width; x++) {
-            // Top border
-            output[x] = temp[x] * (k0 + k1 + k2) + temp[x + width] * k1 + temp[x + width * 2] * k0;
-            output[x + width] = temp[x] * k1 + temp[x + width] * k2 + temp[x + width * 2] * k1 + temp[x + width * 3] * k0;
+            // Top border (Normalized)
+            output[x] = (temp[x] * (k0 + k1 + k2) + temp[x + width] * k1 + temp[x + width * 2] * k0) * (1.0 / (k0 + k1 + k2));
+            output[x + width] = (temp[x] * k1 + temp[x + width] * k2 + temp[x + width * 2] * k1 + temp[x + width * 3] * k0) * (1.0 / (k1 + k2 + k1 + k0));
 
             // Main loop - NO boundary checks
             for (let y = 2; y < height - 2; y++) {
@@ -211,11 +228,11 @@ export class DetectorLite {
                 output[p] = temp[p - width * 2] * k0 + temp[p - width] * k1 + temp[p] * k2 + temp[p + width] * k1 + temp[p + width * 2] * k0;
             }
 
-            // Bottom border
+            // Bottom border (Normalized)
             const b2 = (height - 2) * width + x;
             const b1 = (height - 1) * width + x;
-            output[b2] = temp[b2 - width * 2] * k0 + temp[b2 - width] * k1 + temp[b2] * k2 + temp[b1] * k1;
-            output[b1] = temp[b1 - width * 2] * k0 + temp[b1 - width] * k1 + temp[b1] * (k2 + k1 + k0);
+            output[b2] = (temp[b2 - width * 2] * k0 + temp[b2 - width] * k1 + temp[b2] * k2 + temp[b1] * k1) * (1.0 / (k0 + k1 + k2 + k1));
+            output[b1] = (temp[b1 - width * 2] * k0 + temp[b1 - width] * k1 + temp[b1] * (k2 + k1 + k0)) * (1.0 / (k0 + k1 + k2));
         }
 
         return { data: output, width, height };

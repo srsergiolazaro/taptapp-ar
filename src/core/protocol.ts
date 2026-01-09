@@ -1,6 +1,7 @@
 import * as msgpack from "@msgpack/msgpack";
 
-export const CURRENT_VERSION = 8;
+export const CURRENT_VERSION = 9; // Bumped for HDC support
+export const HDC_SEED = 0x1337BEEF; // Default system seed
 
 /**
  * Morton Order calculation for spatial sorting
@@ -59,13 +60,19 @@ export function unpack4Bit(packed: Uint8Array, width: number, height: number): U
 /**
  * Columnarizes point data for efficient storage and transfer
  */
-export function columnarize(points: any[], tree: any, width: number, height: number) {
+export function columnarize(points: any[], tree: any, width: number, height: number, useHDC: boolean = false) {
     const count = points.length;
     const x = new Uint16Array(count);
     const y = new Uint16Array(count);
     const angle = new Int16Array(count);
     const scale = new Uint8Array(count);
-    const descriptors = new Uint32Array(count * 2);
+
+    let descriptors: any;
+    if (useHDC) {
+        descriptors = new Uint32Array(count); // HDC Signatures (32-bit)
+    } else {
+        descriptors = new Uint32Array(count * 2); // Raw Descriptors (64-bit)
+    }
 
     for (let i = 0; i < count; i++) {
         x[i] = Math.round((points[i].x / width) * 65535);
@@ -74,8 +81,15 @@ export function columnarize(points: any[], tree: any, width: number, height: num
         scale[i] = Math.round(Math.log2(points[i].scale || 1));
 
         if (points[i].descriptors && points[i].descriptors.length >= 2) {
-            descriptors[i * 2] = points[i].descriptors[0];
-            descriptors[(i * 2) + 1] = points[i].descriptors[1];
+            if (useHDC) {
+                // For HDC, we'd normally call project + compress here
+                // But protocol.ts should be agnostic of the generator.
+                // We'll assume points[i].hdcSignature exists if pre-calculated
+                descriptors[i] = points[i].hdcSignature || 0;
+            } else {
+                descriptors[i * 2] = points[i].descriptors[0];
+                descriptors[(i * 2) + 1] = points[i].descriptors[1];
+            }
         }
     }
 
@@ -85,6 +99,7 @@ export function columnarize(points: any[], tree: any, width: number, height: num
         a: angle,
         s: scale,
         d: descriptors,
+        hdc: useHDC ? 1 : 0, // HDC Flag (renamed from h to avoid collision with height)
         t: compactTree(tree.rootNode),
     };
 }
@@ -209,7 +224,12 @@ export function decodeTaar(buffer: ArrayBuffer | Uint8Array) {
                 }
 
                 if (col.d instanceof Uint8Array) {
-                    col.d = new Uint32Array(col.d.buffer.slice(col.d.byteOffset, col.d.byteOffset + col.d.byteLength));
+                    // Check if it's HDC (Uint32) or Raw (Uint32 x 2)
+                    if (col.hdc === 1) {
+                        col.d = new Uint32Array(col.d.buffer.slice(col.d.byteOffset, col.d.byteOffset + col.d.byteLength));
+                    } else {
+                        col.d = new Uint32Array(col.d.buffer.slice(col.d.byteOffset, col.d.byteOffset + col.d.byteLength));
+                    }
                 }
             }
         }

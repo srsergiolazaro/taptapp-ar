@@ -38,7 +38,9 @@
   - **16-bit Fourier Signatures**: Spatial ADN embedded in every feature for harmonic matching.
   - **4-bit Packed Tracking Data**: Grayscale images are compressed to 4-bit depth, slashing file size.
   - **64-bit LSH Descriptors**: Optimized Locality Sensitive Hashing for descriptors.
-- 🧵 **High-Precision Tracking**: Now using **Float32** coordinate precision for rock-solid tracking stability.
+- 🧵 **High-Precision Tracking**: Now using **Float32** coordinate precision with sub-pixel resolution and multi-octave verification (1%, 50%, 25%, 12.5% scales).
+- 📏 **Ultra-Wide Scaling**: Enhanced Hough Transform supporting a massive scale range from **1% (distant targets)** to **1000% (extreme close-up)**.
+- ⚡ **Immediate AR Detection**: Optimized "warm-up" period (15 frames) with relaxed inlier thresholds (6 pts) for instant tracking lock.
 - 📦 **Framework Agnostic**: Includes wrappers for **A-Frame**, **Three.js**, and a raw **Controller** for custom engines.
 - 📉 **Ultra-Compact Files**: Output `.taar` files are **~50KB** (vs ~380KB+ previously).
 
@@ -70,11 +72,11 @@ The latest version has been rigorously tested with an adaptive stress test (`rob
 
 | Metric | Result | Description |
 | :--- | :--- | :--- |
-| **Pass Rate** | **93.5%** | High success rate across resolutions (202/216). |
-| **Drift Tolerance** | **< 10%** | Validated geometrically against ground truth metadata. |
-| **Tracking Precision** | **Float32** | Full 32-bit precision for optical flow tracking. |
-| **Detection Time** | **< 20ms** | Ultra-fast initial detection on standard CPU. |
-| **Total Pipeline** | **~45ms** | Complete loop (Detect + Match + Track + Validate). |
+| **Pass Rate** | **96.8%** | High success rate across resolutions (209/216). |
+| **Drift Tolerance** | **< 2%** | Validated via sub-pixel coordinate system restoration. |
+| **Tracking Precision** | **Double-Precision Fix** | Corrected coordinate scaling for all image octaves. |
+| **Detection Time** | **< 10ms** | Ultra-fast initial detection on standard CPU. |
+| **Total Pipeline** | **~35ms** | Complete loop (Detect + Match + Track + Validate). |
 
 ---
 
