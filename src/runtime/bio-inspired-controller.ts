@@ -27,6 +27,20 @@
 
 import { Controller, ControllerOptions } from './controller.js';
 import { BioInspiredEngine, BIO_CONFIG } from '../core/perception/index.js';
+import { AutoRotationFeature } from '../core/features/auto-rotation-feature.js';
+
+/**
+ * Result from BioInspiredEngine.process()
+ */
+interface BioResult {
+    skipped: boolean;
+    prediction?: {
+        worldMatrix?: Float32Array;
+    };
+    attentionRegions?: any[];
+    foveaCenter?: { x: number; y: number };
+    pixelsSaved?: number;
+}
 
 /**
  * Extended options for Bio-Inspired Controller
@@ -119,7 +133,7 @@ class BioInspiredController extends Controller {
                 } : null;
 
                 // Process through bio-inspired engine
-                const bioResult = this.bioEngine!.process(inputData, trackingState);
+                const bioResult: BioResult = this.bioEngine!.process(inputData, trackingState ?? undefined);
                 this.lastBioResult = bioResult;
 
                 // If bio engine says we can skip, use prediction
@@ -173,7 +187,7 @@ class BioInspiredController extends Controller {
      * Process frame using bio-inspired attention regions
      * @private
      */
-    private async _processWithAttention(input: any, inputData: Uint8Array, bioResult: any) {
+    private async _processWithAttention(input: any, inputData: Uint8Array, bioResult: BioResult) {
         const nTracking = this.trackingStates.reduce((acc, s) => acc + (s.isTracking ? 1 : 0), 0);
 
         // Detection phase - use primary attention region for efficiency
@@ -256,10 +270,9 @@ class BioInspiredController extends Controller {
 
                     const isInputRotated = input.width === this.inputHeight && input.height === this.inputWidth;
                     if (isInputRotated) {
-                        const { AutoRotationFeature } = await import('../core/features/auto-rotation-feature.js');
-                        const rotationFeature = this.featureManager.getFeature<typeof AutoRotationFeature>('auto-rotation');
+                        const rotationFeature = this.featureManager.getFeature<AutoRotationFeature>('auto-rotation');
                         if (rotationFeature) {
-                            finalMatrix = (rotationFeature as any).rotate(finalMatrix);
+                            finalMatrix = rotationFeature.rotate(finalMatrix);
                         }
                     }
                 }
