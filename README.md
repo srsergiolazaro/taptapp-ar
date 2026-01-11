@@ -59,7 +59,7 @@ npm install @srsergio/taptapp-ar
 
 | Metric | Official MindAR | TapTapp AR V11 | Improvement |
 | :--- | :--- | :--- | :--- |
-| **Compilation Time** | ~23.50s | **~1.15s** | 🚀 **~20x Faster** |
+| **Compilation Time** | ~23.50s | **~1.69s (HD)** | 🚀 **~14x Faster** |
 | **Output Size (.taar)** | ~770 KB | **~103 KB** | 📉 **86% Smaller** |
 | **Matching Logic** | Brute-force | **Nanite LOD (Scale-Filtered)** | 🧠 **Smart Extraction** |
 | **Tracking Data** | 8-bit Gray | **4-bit Packed** | 📦 **50% Data Saving** |

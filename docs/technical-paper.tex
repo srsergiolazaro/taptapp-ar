@@ -158,9 +158,9 @@ Dominant orientation is computed via a 36-bin histogram of gradient directions w
 
 Binary descriptors are computed by sampling 37 points in a retinal pattern and performing pairwise intensity comparisons, yielding a 512-bit descriptor (compressed to 672 bits for alignment in the reference implementation).
 
-\subsubsection{Stage 7: 64-bit LSH Fingerprinting}
+\subsubsection{Stage 7: 32-bit LSH Fingerprinting}
 
-To achieve ultra-lightweight bundles, we project the high-dimensional FREAK descriptor onto a 64-bit binary space using Locality Sensitive Hashing (LSH). We sample 64 discriminative bit-pairs to create a fingerprint $H \in \{0,1\}^{64}$. The similarity between two features is computed using the Hamming distance $d_H$, highly efficient on modern CPUs via the \texttt{popcount} instruction.
+To achieve ultra-lightweight bundles, we project the high-dimensional FREAK descriptor onto a 32-bit binary space using Locality Sensitive Hashing (LSH). We sample 32 discriminative bit-pairs to create a fingerprint $H \in \{0,1\}^{32}$. The similarity between two features is computed using the Hamming distance $d_H$, highly efficient on modern CPUs via the \texttt{popcount} instruction.
 
 \subsubsection{Stage 8: Fourier Positional Encoding}
 
@@ -244,10 +244,10 @@ This eliminates the "authoring bottleneck," allowing developers to use any image
 \label{tab:results}
 \begin{tabular}{lccc}
 \toprule
-\textbf{Metric} & \textbf{V4 Baseline} & \textbf{V7 (Non-Rigid)} & \textbf{Reduction} \\
+\textbf{Metric} & \textbf{V4 Baseline} & \textbf{V11 (Nanite)} & \textbf{Reduction} \\
 \midrule
-Metadata (.taar) & 770 KB & \textbf{338 KB} & 56\% \\
-Descriptor Size & 84 bytes & \textbf{16 bytes} & 81\% \\
+Metadata (.taar) & 770 KB & \textbf{103 KB} & 86\% \\
+Descriptor Size & 84 bytes & \textbf{4 bytes (32-bit)} & 95\% \\
 Tracking Model & Rigid Homography & \textbf{Deformable Mesh} & Non-Planar Support \\
 Inliers (Stability) & 768 & 742 & -3\% \\
 \bottomrule
