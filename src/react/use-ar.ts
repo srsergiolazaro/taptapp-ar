@@ -65,6 +65,7 @@ export const useAR = (config: ARConfig): UseARReturn => {
                     targetSrc: config.targetTaarSrc || config.targetImageSrc,
                     overlay: overlayRef.current!,
                     scale: config.scale,
+                    cameraConfig: config.cameraConfig,
                     debugMode: false,
                     callbacks: {
                         onUpdate: (data) => {
@@ -129,7 +130,7 @@ export const useAR = (config: ARConfig): UseARReturn => {
             arInstanceRef.current?.stop();
             arInstanceRef.current = null;
         };
-    }, [config.targetTaarSrc, config.targetImageSrc, config.scale]);
+    }, [config.targetTaarSrc, config.targetImageSrc, config.scale, config.cameraConfig]);
 
     return {
         containerRef,

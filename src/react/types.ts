@@ -6,6 +6,7 @@ export interface ARConfig {
   videoWidth: number;
   videoHeight: number;
   scale: number;
+  cameraConfig?: MediaStreamConstraints['video'];
 }
 
 export interface ARDataItem {

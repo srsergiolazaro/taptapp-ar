@@ -123,31 +123,100 @@ export const MyARScene = () => (
 );
 ```
 
-### 2. The Powerful Way: `startTracking` API
+### 2. High-Performance React Hook: `useAR` 🪝
 
-For vanilla JS or custom integrations, use the new high-level API:
+For more control over the AR state or custom UI overlays:
+
+```tsx
+import { useAR } from '@srsergio/taptapp-ar/react';
+
+const MyCustomAR = () => {
+  const { 
+    containerRef, 
+    overlayRef, 
+    status, 
+    trackedPoints, 
+    error 
+  } = useAR({
+    targetImageSrc: "target.png",
+    scale: 1.0
+  });
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '100vh' }}>
+      {/* Your custom 3D or 2D overlay */}
+      <video ref={overlayRef} src="content.mp4" />
+      
+      {/* Use trackedPoints for custom visualizations */}
+      {trackedPoints.map((p, i) => (
+        <div key={i} style={{ position: 'absolute', left: p.x, top: p.y }} />
+      ))}
+    </div>
+  );
+};
+```
+
+### 3. Native API: `startTracking`
+
+For vanilla JS or custom integrations:
 
 ```typescript
-import { startTracking } from '@srsergio/taptapp-ar';
-
 const tracker = await startTracking({
-    targetSrc: './assets/target.jpg', // No .taar needed!
+    targetSrc: './assets/target.jpg',
     container: document.getElementById('ar-container'),
     overlay: document.getElementById('overlay-element'),
     
-    // Optional callbacks
+    // 📸 Custom Camera Config
+    cameraConfig: {
+        facingMode: 'environment', // Use back camera
+        width: { ideal: 1920 },    // Request Full HD
+        height: { ideal: 1080 }
+    },
+    
     callbacks: {
-        onFound: () => console.log("Target Found! 🎯"),
-        onLost: () => console.log("Target Lost 👋"),
+        onFound: () => console.log("Target Found!"),
         onUpdate: (data) => {
-             console.log("Stability:", data.avgStability);
+             console.log(`Stability: ${data.avgStability}`);
         }
     }
 });
-
-// Stop later
-// tracker.stop();
 ```
+
+### 4. Custom Overlays (Beyond Video/Images) 🧩
+
+The `overlay` isn't limited to images or videos. You can use **any HTML element** (divs, buttons, canvas, etc.). The engine will apply the transformation matrix automatically to align it with the target.
+
+```tsx
+// Using an interactive HTML overlay in React
+const InteractiveAR = () => {
+  const { containerRef, overlayRef, status } = useAR({
+    targetImageSrc: "map.jpg",
+    scale: 1.0
+  });
+
+  return (
+    <div ref={containerRef}>
+      {/* 🚀 This div will be pinned and skewed to the physical target */}
+      <div 
+        ref={overlayRef as any} 
+        style={{ background: 'white', padding: '10px', borderRadius: '8px' }}
+      >
+        <h4>Dynamic UI</h4>
+        <button onClick={() => alert('Clicked!')}>Interacción AR</button>
+      </div>
+    </div>
+  );
+};
+```
+
+#### `TrackingUpdate` Data Object
+The `onUpdate` callback provides a rich data object:
+- `isTracking`: Boolean status.
+- `avgReliability`: (0-1) Confidence of the match.
+- `avgStability`: (0-1) Movement smoothness.
+- `screenCoords`: Array of `{x, y, id}` of tracked points.
+- `worldMatrix`: 4x4 matrix for WebGL/Three.js integration.
+- `targetDimensions`: `[width, height]` of the source target.
 
 ### 3. Advanced Integration (Three.js / A-Frame)
 
