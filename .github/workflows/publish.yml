@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      - name: Build
+        run: npm run build
+
       - name: Bump version and Publish
         run: |
           # Try to bump version. If it fails (e.g. tag already exists), find the next available version.
