@@ -1,0 +1,13 @@
+tests/
+scripts/
+docs/
+.github/
+.astro/
+node_modules/
+dist/compiler/node-worker.ts
+tsconfig.json
+vite.config.js
+pnpm-lock.yaml
+pnpm-workspace.yaml
+*.log
+.DS_Store

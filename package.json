@@ -41,12 +41,12 @@
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
         },
-        "./compiler/*": "./src/compiler/*"
+        "./compiler/*": "./dist/compiler/*"
     },
     "files": [
         "dist",
-        "src",
-        "README.md"
+        "README.md",
+        "LICENSE"
     ],
     "scripts": {
         "build": "tsc",
