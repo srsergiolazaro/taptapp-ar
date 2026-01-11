@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@srsergio/taptapp-ar.svg?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
 [![npm downloads](https://img.shields.io/npm/dm/@srsergio/taptapp-ar.svg?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![License: Fair Source-0.9](https://img.shields.io/badge/License-Fair_Source--0.9-blue.svg?style=flat-square)](./LICENSE)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/@srsergio/taptapp-ar?style=flat-square)](https://bundlephobia.com/package/@srsergio/taptapp-ar)
 
 🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) toolkit for **Node.js** and **Browser** environments. It provides an ultra-fast offline compiler and a lightweight runtime for image tracking.
@@ -178,7 +178,17 @@ TapTapp AR uses a proprietary **Nanite-style Vision Codec** that is significantl
 
 ## 📄 License & Credits
 
+This project is licensed under the **Fair Source License v0.9**.
+
+### What does this mean?
+- **Small Entities & Individuals**: You can use, modify, and distribute this software for **FREE** (including commercial use).
+- **Large Entities**: If your organization has **100+ employees** OR **$10,000,000+ USD in annual revenue**, you must obtain a separate commercial license from the copyright holder before using it in a commercial context.
+
+This model allows us to keep the project open and free for the community while ensuring sustainability from large-scale corporate usage.
+
+---
 MIT © [srsergiolazaro](https://github.com/srsergiolazaro)
 
-Based on the core research of MindAR, but completely re-written for high-performance binary processing and JS-only execution.
+Based on core research from the community, but completely re-written for high-performance binary processing and JS-only execution.
+
 
