@@ -133,7 +133,7 @@ class BioInspiredController extends Controller {
                 } : null;
 
                 // Process through bio-inspired engine
-                const bioResult: BioResult = this.bioEngine!.process(inputData, trackingState ?? undefined);
+                const bioResult = this.bioEngine!.process(inputData, (trackingState as any) || undefined) as BioResult;
                 this.lastBioResult = bioResult;
 
                 // If bio engine says we can skip, use prediction
