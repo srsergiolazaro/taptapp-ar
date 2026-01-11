@@ -30,19 +30,19 @@
 ## 🌟 Key Features
 
 - 🎭 **Non-Rigid Surface Tracking**: Supports curved and deformable surfaces using **Delaunay Meshes** and **Mass-Spring Relaxation**.
-- 🚀 **Hyper-Fast Compiler**: Pure JavaScript compiler that generates `.taar` files in **< 3s**.
+- 🚀 **Nanite-style Virtualized Features**: Single-pass multi-octave detection with stratified sampling.
 - ⚡ **No TensorFlow Dependency**: No TFJS at all. Works natively in any JS environment (Node, Browser, Workers).
 - 🧬 **Fourier Positional Encoding**: Uses high-frequency sine/cosine mappings (GPT-style) for neural-like spatial consistency.
-- 🚀 **Protocol V7 (Moonshot)**: 
-  - **Delaunay Triangular Grid**: Adaptive mesh that tracks surface deformations.
-  - **16-bit Fourier Signatures**: Spatial ADN embedded in every feature for harmonic matching.
+- 🚀 **Protocol V11 (Nanite)**: 
+  - **Stratified Multi-Octave Sampling**: 300 reliable features per octave, capped at 1,200 total per target.
+  - **Dynamic Scale Filtering (LOD)**: Runtime matching engine skips irrelevant octaves based on estimated scale.
   - **4-bit Packed Tracking Data**: Grayscale images are compressed to 4-bit depth, slashing file size.
-  - **64-bit LSH Descriptors**: Optimized Locality Sensitive Hashing for descriptors.
-- 🧵 **High-Precision Tracking**: Now using **Float32** coordinate precision with sub-pixel resolution and multi-octave verification (1%, 50%, 25%, 12.5% scales).
-- 📏 **Ultra-Wide Scaling**: Enhanced Hough Transform supporting a massive scale range from **1% (distant targets)** to **1000% (extreme close-up)**.
+  - **64-bit LSH Descriptors**: Optimized Locality Sensitive Hashing with XOR folding support.
+- 🧵 **High-Precision Tracking**: Now using **Float32** coordinate precision with sub-pixel resolution and stratified scale coverage.
+- 📏 **Virtualized Scale Range**: Stable tracking from **20% (distant targets)** to **1000% (close-up)** using a single high-res keyframe.
 - ⚡ **Immediate AR Detection**: Optimized "warm-up" period (15 frames) with relaxed inlier thresholds (6 pts) for instant tracking lock.
 - 📦 **Framework Agnostic**: Includes wrappers for **A-Frame**, **Three.js**, and a raw **Controller** for custom engines.
-- 📉 **Ultra-Compact Files**: Output `.taar` files are **~50KB** (vs ~380KB+ previously).
+- 📉 **Ultra-Compact Files**: Output `.taar` files are now **~100KB** (vs ~380KB+ previously).
 
 ---
 
@@ -56,11 +56,11 @@ npm install @srsergio/taptapp-ar
 
 ## 📊 Industry-Leading Benchmarks (v7 Moonshot)
 
-| Metric | Official MindAR | TapTapp AR V7 | Improvement |
+| Metric | Official MindAR | TapTapp AR V11 | Improvement |
 | :--- | :--- | :--- | :--- |
-| **Compilation Time** | ~23.50s | **~0.93s** | 🚀 **~25x Faster** |
-| **Output Size (.taar)** | ~770 KB | **~338 KB** | 📉 **56% Smaller** |
-| **Descriptor Format** | 84-byte Float | **128-bit LSH** | 🧠 **Massive Data Saving** |
+| **Compilation Time** | ~23.50s | **~1.15s** | 🚀 **~20x Faster** |
+| **Output Size (.taar)** | ~770 KB | **~103 KB** | 📉 **86% Smaller** |
+| **Matching Logic** | Brute-force | **Nanite LOD (Scale-Filtered)** | 🧠 **Smart Extraction** |
 | **Tracking Data** | 8-bit Gray | **4-bit Packed** | 📦 **50% Data Saving** |
 | **Dependency Size** | ~20MB (TFJS) | **< 100KB** | 📦 **99% Smaller Bundle** |
 
@@ -259,9 +259,11 @@ ar.stop();
 
 ---
 
-## 🏗️ Protocol V7 (Moonshot Packed Format)
-TapTapp AR uses a proprietary **Moonshot Vision Codec** that is significantly more efficient than standard AR formats.
+## 🏗️ Protocol V11 (Nanite Virtualized Format)
+TapTapp AR uses a proprietary **Nanite-style Vision Codec** that is significantly more efficient than standard AR formats.
 
+- **Virtualized Multi-Octave Features**: Instead of storing redundant images for each scale, V11 stores a single high-res keyframe with features stratified across 6 octaves.
+- **Dynamic Scale Filtering**: The tracking engine estimates the target's current scale and dynamically filters the matching search space, reducing Hamming distance ops by up to 90%.
 - **Non-Rigid Surface Tracking**: Replaces the standard rigid homography with a dynamic **Delaunay Mesh**. This allows the tracker to follow the curvature of posters on cylinders, t-shirts, or slightly bent magazines.
 - **Mass-Spring Relaxation**: The tracking mesh is optimized using physical relaxation, minimizing L2 distance between predicted and tracked points while maintaining topological rigidity.
 - **Fourier Positional Encoding**: Maps 2D coordinates into a 16-dimensional frequency space. This creates a "Neural Consistency Check" that filters out noise and motion blur by checking for harmonic spatial agreement.

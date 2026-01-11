@@ -7,7 +7,7 @@ class Matcher {
     this.debugMode = debugMode;
   }
 
-  matchDetection(keyframes, featurePoints) {
+  matchDetection(keyframes, featurePoints, expectedScale) {
     let debugExtra = { frames: [] };
     let bestResult = null;
 
@@ -27,6 +27,7 @@ class Matcher {
         querywidth: this.queryWidth,
         queryheight: this.queryHeight,
         debugMode: this.debugMode,
+        expectedScale,
       });
 
       if (frameDebugExtra) {
@@ -48,18 +49,21 @@ class Matcher {
     const screenCoords = [];
     const worldCoords = [];
     const keyframe = keyframes[bestResult.keyframeIndex];
-    const scale = keyframe.s || keyframe.scale || 1.0;
+    const kfScale = keyframe.s || keyframe.scale || 1.0;
 
     for (let i = 0; i < bestResult.matches.length; i++) {
       const querypoint = bestResult.matches[i].querypoint;
       const keypoint = bestResult.matches[i].keypoint;
+      // 🚀 NANITE-STYLE: Use per-keypoint scale (octave) for accurate world mapping
+      const pointScale = keypoint.scale || kfScale;
+
       screenCoords.push({
         x: querypoint.x,
         y: querypoint.y,
       });
       worldCoords.push({
-        x: (keypoint.x + 0.5) / scale,
-        y: (keypoint.y + 0.5) / scale,
+        x: (keypoint.x + 0.5) / kfScale,
+        y: (keypoint.y + 0.5) / kfScale,
         z: 0,
       });
     }

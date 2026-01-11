@@ -1,6 +1,6 @@
 import * as msgpack from "@msgpack/msgpack";
 
-export const CURRENT_VERSION = 10; // Bumped for compact descriptors support
+export const CURRENT_VERSION = 11; // Bumped for Nanite virtualized features support
 export const HDC_SEED = 0x1337BEEF; // Default system seed
 
 /**

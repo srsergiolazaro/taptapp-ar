@@ -302,10 +302,21 @@ class BioInspiredController extends Controller {
      * Detect and match features, optionally limited to specific octaves
      */
     async _detectAndMatch(inputData: any, targetIndexes: number[], octavesToProcess: number[] | null = null) {
+        // 🚀 NANITE-STYLE: Estimate scale for filtered matching
+        let predictedScale: number | undefined = undefined;
+        for (const state of this.trackingStates) {
+            if (state.isTracking && state.currentModelViewTransform) {
+                const m = state.currentModelViewTransform;
+                predictedScale = Math.sqrt(m[0][0] ** 2 + m[1][0] ** 2 + m[2][0] ** 2);
+                break;
+            }
+        }
+
         const { targetIndex, modelViewTransform, screenCoords, worldCoords, featurePoints } = await this._workerMatch(
             null, // No feature points, worker will detect from inputData
             targetIndexes,
             inputData,
+            predictedScale,
             octavesToProcess
         );
         return { targetIndex, modelViewTransform, screenCoords, worldCoords, featurePoints };
@@ -314,7 +325,7 @@ class BioInspiredController extends Controller {
     /**
      * Communicate with worker for matching phase
      */
-    _workerMatch(featurePoints: any, targetIndexes: number[], inputData: any = null, octavesToProcess: number[] | null = null): Promise<any> {
+    _workerMatch(featurePoints: any, targetIndexes: number[], inputData: any = null, expectedScale?: number, octavesToProcess: number[] | null = null): Promise<any> {
         return new Promise((resolve) => {
             if (!this.worker) {
                 // If no feature points but we have input data, detect first
@@ -326,7 +337,7 @@ class BioInspiredController extends Controller {
                 }
 
                 fpPromise.then(fp => {
-                    this._matchOnMainThread(fp, targetIndexes).then(resolve);
+                    this._matchOnMainThread(fp, targetIndexes, expectedScale).then(resolve);
                 }).catch(() => resolve({ targetIndex: -1 }));
                 return;
             }
@@ -343,9 +354,9 @@ class BioInspiredController extends Controller {
             };
 
             if (inputData) {
-                this.worker.postMessage({ type: "match", inputData, targetIndexes, octavesToProcess });
+                this.worker.postMessage({ type: "match", inputData, targetIndexes, octavesToProcess, expectedScale });
             } else {
-                this.worker.postMessage({ type: "match", featurePoints: featurePoints, targetIndexes });
+                this.worker.postMessage({ type: "match", featurePoints: featurePoints, targetIndexes, expectedScale });
             }
         });
     }

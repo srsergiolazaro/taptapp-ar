@@ -94,36 +94,51 @@ export class OfflineCompiler {
         const results = [];
         for (let i = 0; i < targetImages.length; i++) {
             const targetImage = targetImages[i];
-            const fullImageList = buildImageList(targetImage);
-            // 🚀 MOONSHOT: Keep many scales for better robustness
-            const imageList = fullImageList;
-            const percentPerImageScale = percentPerImage / imageList.length;
 
-            const keyframes = [];
+            // 🚀 NANITE-STYLE: Only process the target at scale 1.0
+            // The DetectorLite already builds its own pyramid and finds features at all octaves (virtualized LOD)
+            const detector = new DetectorLite(targetImage.width, targetImage.height, {
+                useLSH: AR_CONFIG.USE_LSH,
+                maxFeaturesPerBucket: AR_CONFIG.MAX_FEATURES_PER_BUCKET
+            });
+            const { featurePoints: rawPs } = detector.detect(targetImage.data);
 
-            for (const image of imageList as any[]) {
-                const detector = new DetectorLite(image.width, image.height, { useLSH: AR_CONFIG.USE_LSH, maxFeaturesPerBucket: AR_CONFIG.MAX_FEATURES_PER_BUCKET });
-                const { featurePoints: ps } = detector.detect(image.data);
+            // 🎯 Stratified Sampling: Ensure we have features from ALL scales
+            // We take the top N features per octave to guarantee scale coverage (Nanite-style)
+            const octaves = [0, 1, 2, 3, 4, 5];
+            const ps: any[] = [];
+            const featuresPerOctave = 300;
 
-                const maximaPoints = ps.filter((p: any) => p.maxima);
-                const minimaPoints = ps.filter((p: any) => !p.maxima);
-                const maximaPointsCluster = hierarchicalClusteringBuild({ points: maximaPoints });
-                const minimaPointsCluster = hierarchicalClusteringBuild({ points: minimaPoints });
-
-                keyframes.push({
-                    maximaPoints,
-                    minimaPoints,
-                    maximaPointsCluster,
-                    minimaPointsCluster,
-                    width: image.width,
-                    height: image.height,
-                    scale: image.scale,
-                });
-                currentPercent += percentPerImageScale;
-                progressCallback(currentPercent);
+            for (const oct of octaves) {
+                const octScale = Math.pow(2, oct);
+                const octFeatures = rawPs
+                    .filter(p => Math.abs(p.scale - octScale) < 0.1)
+                    .sort((a, b) => (b.score || 0) - (a.score || 0))
+                    .slice(0, featuresPerOctave);
+                ps.push(...octFeatures);
             }
 
-            results.push(keyframes);
+            const maximaPoints = ps.filter((p: any) => p.maxima);
+            const minimaPoints = ps.filter((p: any) => !p.maxima);
+            const maximaPointsCluster = hierarchicalClusteringBuild({ points: maximaPoints });
+            const minimaPointsCluster = hierarchicalClusteringBuild({ points: minimaPoints });
+
+            const keyframe = {
+                maximaPoints,
+                minimaPoints,
+                maximaPointsCluster,
+                minimaPointsCluster,
+                width: targetImage.width,
+                height: targetImage.height,
+                scale: 1.0,
+            };
+
+            // Wrapped in array because the protocol expects matchingData to be an array of keyframes
+            // We provide only one keyframe containing features from all octaves
+            results.push([keyframe]);
+
+            currentPercent += percentPerImage;
+            progressCallback(currentPercent);
         }
 
         return results;

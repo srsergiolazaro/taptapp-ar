@@ -257,10 +257,23 @@ class Controller {
     }
 
     async _detectAndMatch(inputData: any, targetIndexes: number[]) {
+        // 🚀 NANITE-STYLE: Estimate scale for filtered matching
+        // If we were already tracking a target, use its scale as a hint for faster matching
+        let predictedScale: number | undefined = undefined;
+        for (const state of this.trackingStates) {
+            if (state.isTracking && state.currentModelViewTransform) {
+                const m = state.currentModelViewTransform;
+                // Vector magnitude of the first column is a good approximation of the scale
+                predictedScale = Math.sqrt(m[0][0] ** 2 + m[1][0] ** 2 + m[2][0] ** 2);
+                break;
+            }
+        }
+
         const { targetIndex, modelViewTransform, screenCoords, worldCoords, featurePoints } = await this._workerMatch(
             null, // No feature points, worker will detect from inputData
             targetIndexes,
-            inputData
+            inputData,
+            predictedScale
         );
         return { targetIndex, modelViewTransform, screenCoords, worldCoords, featurePoints };
     }
@@ -522,7 +535,7 @@ class Controller {
         return this._workerTrackUpdate(modelViewTransform, trackFeatures);
     }
 
-    _workerMatch(featurePoints: any, targetIndexes: number[], inputData: any = null): Promise<any> {
+    _workerMatch(featurePoints: any, targetIndexes: number[], inputData: any = null, expectedScale?: number): Promise<any> {
         return new Promise((resolve) => {
             if (!this.worker) {
                 // If no feature points but we have input data, detect first
@@ -534,7 +547,7 @@ class Controller {
                 }
 
                 fpPromise.then(fp => {
-                    this._matchOnMainThread(fp, targetIndexes).then(resolve);
+                    this._matchOnMainThread(fp, targetIndexes, expectedScale).then(resolve);
                 }).catch(() => resolve({ targetIndex: -1 }));
                 return;
             }
@@ -558,9 +571,9 @@ class Controller {
             };
 
             if (inputData) {
-                this.worker.postMessage({ type: "match", inputData, targetIndexes });
+                this.worker.postMessage({ type: "match", inputData, targetIndexes, expectedScale });
             } else {
-                this.worker.postMessage({ type: "match", featurePoints: featurePoints, targetIndexes });
+                this.worker.postMessage({ type: "match", featurePoints: featurePoints, targetIndexes, expectedScale });
             }
         });
     }
@@ -592,7 +605,7 @@ class Controller {
         });
     }
 
-    async _matchOnMainThread(featurePoints: any, targetIndexes: number[]) {
+    async _matchOnMainThread(featurePoints: any, targetIndexes: number[], expectedScale?: number) {
         if (!this.mainThreadMatcher) {
             const { Matcher } = await import("../core/matching/matcher.js");
             const { Estimator } = await import("../core/estimation/estimator.js");
@@ -611,6 +624,7 @@ class Controller {
             const { keyframeIndex, screenCoords, worldCoords, debugExtra } = this.mainThreadMatcher.matchDetection(
                 this.matchingDataList[matchingIndex],
                 featurePoints,
+                expectedScale
             );
             matchedDebugExtra = debugExtra;
 

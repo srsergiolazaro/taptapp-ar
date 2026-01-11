@@ -15,7 +15,7 @@ const HDC_RATIO_THRESHOLD = AR_CONFIG.HDC_RATIO_THRESHOLD;
 const MAX_MATCH_QUERY_POINTS = AR_CONFIG.MAX_MATCH_QUERY_POINTS;
 
 // match list of querpoints against pre-built list of keyframes
-const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight, debugMode }) => {
+const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight, debugMode, expectedScale }) => {
   let debugExtra = {};
 
   // 🎯 Performance Optimizer: Use only the most "salient" points (highest response)
@@ -72,6 +72,17 @@ const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight,
     for (let k = 0; k < keypointIndexes.length; k++) {
       const idx = keypointIndexes[k];
 
+      // 🚀 NANITE-STYLE: Dynamic scale filtering
+      // If we have an expected scale, skip points that are outside the resolution range
+      if (expectedScale !== undefined && col.s) {
+        const featureScale = col.s[idx]; // Octave scale (1, 2, 4...)
+        const idealKeyScale = (querypoint.scale || 1.0) / expectedScale;
+        // allow ~1 octave of margin
+        if (featureScale < idealKeyScale * 0.4 || featureScale > idealKeyScale * 2.5) {
+          continue;
+        }
+      }
+
       let d;
       if (isHDC) {
         d = popcount32(cDesc[idx] ^ querypoint.hdcSignature);
@@ -113,11 +124,6 @@ const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight,
     return { debugExtra };
   }
 
-  // Debug: Log Hamming results
-  if (Math.random() < 0.1 && debugMode) {
-    console.log(`MATCH_DL: Hamming found ${matches.length} initial matches`);
-  }
-
   // 🌌 Moonshot: Constellation matching disabled for performance calibration
   const constellationMatches = matches;
   if (debugMode) debugExtra.constellationMatches = constellationMatches;
@@ -130,7 +136,9 @@ const match = ({ keyframe, querypoints: rawQuerypoints, querywidth, queryheight,
     matches: constellationMatches,
   });
 
-  if (debugMode) debugExtra.houghMatches = houghMatches;
+  if (debugMode) {
+    debugExtra.houghMatches = houghMatches;
+  }
 
   if (houghMatches.length < MIN_NUM_INLIERS) {
     return { debugExtra };

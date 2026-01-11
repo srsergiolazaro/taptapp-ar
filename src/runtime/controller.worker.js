@@ -59,6 +59,7 @@ onmessage = (msg) => {
         const { keyframeIndex, screenCoords, worldCoords, debugExtra } = matcher.matchDetection(
           matchingDataList[matchingIndex],
           featurePoints,
+          data.expectedScale
         );
         matchedDebugExtra = debugExtra;
 

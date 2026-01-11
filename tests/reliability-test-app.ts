@@ -257,6 +257,10 @@ async function init() {
 function handleARUpdate(data: any, markerW: number, markerH: number, controller: BioInspiredController) {
     if (data.type === 'processDone') return;
 
+    // Clear debug canvas at start of each meaningful update
+    if (data.type === 'featurePoints' || data.type === 'updateMatrix') {
+        debugCtx.clearRect(0, 0, WIDTH, HEIGHT);
+    }
     if (data.type === 'featurePoints') {
         const { featurePoints } = data;
         if (featurePoints) {
@@ -363,7 +367,6 @@ function handleARUpdate(data: any, markerW: number, markerH: number, controller:
 function drawFeaturePoints(points: any[]) {
     // Only draw feature points if we ARE NOT tracking
     if (arStatus.textContent === 'Searching') {
-        debugCtx.clearRect(0, 0, WIDTH, HEIGHT);
         debugCtx.fillStyle = 'rgba(255, 255, 0, 0.6)';
         const limit = Math.min(points.length, 150);
 
@@ -398,8 +401,6 @@ function drawMesh(mesh: { vertices: Float32Array, triangles: Uint16Array }) {
 }
 
 function drawPoints(coords: { x: number, y: number }[], stabilities: number[]) {
-    debugCtx.clearRect(0, 0, WIDTH, HEIGHT);
-
     const limit = Math.min(coords.length, 100);
 
     for (let i = 0; i < limit; i++) {
