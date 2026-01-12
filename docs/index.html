@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TapTapp AR — The Future of AR is Pure JavaScript</title>
+    <meta name="description"
+        content="High-performance Augmented Reality toolkit. 14x faster compilation, 86% smaller files, zero TensorFlow dependency. The paradigm shift in browser-based AR.">
+    <meta name="keywords"
+        content="AR, Augmented Reality, JavaScript, WebAR, Image Tracking, TensorFlow-free, React, TypeScript">
+    <meta name="author" content="srsergiolazaro">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="TapTapp AR — Pure JavaScript AR Toolkit">
+    <meta property="og:description"
+        content="High-performance AR with 14x faster compilation and zero TensorFlow dependency.">
+    <meta property="og:image" content="./images/hero-banner.png">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="TapTapp AR">
+    <meta name="twitter:description" content="The future of AR is Pure JavaScript.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Particle Canvas Background -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Animated SVG Background Elements -->
+    <div class="svg-background">
+        <!-- Animated Glow Orbs -->
+        <svg class="glow-orb orb-1" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="orbGradient1" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.4" />
+                    <stop offset="100%" stop-color="#7c3aed" stop-opacity="0" />
+                </radialGradient>
+            </defs>
+            <circle cx="100" cy="100" r="80" fill="url(#orbGradient1)">
+                <animate attributeName="r" values="70;90;70" dur="4s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.5;0.8;0.5" dur="4s" repeatCount="indefinite" />
+            </circle>
+        </svg>
+        <svg class="glow-orb orb-2" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="orbGradient2" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#00d4aa" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="#00d4aa" stop-opacity="0" />
+                </radialGradient>
+            </defs>
+            <circle cx="100" cy="100" r="60" fill="url(#orbGradient2)">
+                <animate attributeName="r" values="50;70;50" dur="5s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.4;0.7;0.4" dur="5s" repeatCount="indefinite" />
+            </circle>
+        </svg>
+
+        <!-- Animated Mesh Lines -->
+        <svg class="mesh-lines" viewBox="0 0 1200 800" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#00d4aa" stop-opacity="0" />
+                    <stop offset="50%" stop-color="#00d4aa" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="#00d4aa" stop-opacity="0" />
+                </linearGradient>
+            </defs>
+            <path d="M0,400 Q300,300 600,400 T1200,400" stroke="url(#lineGradient)" stroke-width="1" fill="none">
+                <animate attributeName="d"
+                    values="M0,400 Q300,300 600,400 T1200,400;M0,400 Q300,500 600,400 T1200,400;M0,400 Q300,300 600,400 T1200,400"
+                    dur="8s" repeatCount="indefinite" />
+            </path>
+            <path d="M0,200 Q400,300 800,200 T1200,200" stroke="url(#lineGradient)" stroke-width="0.5" fill="none"
+                opacity="0.5">
+                <animate attributeName="d"
+                    values="M0,200 Q400,300 800,200 T1200,200;M0,200 Q400,100 800,200 T1200,200;M0,200 Q400,300 800,200 T1200,200"
+                    dur="10s" repeatCount="indefinite" />
+            </path>
+        </svg>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-logo">
+                <span class="logo-icon">🎯</span>
+                <span class="logo-text">TapTapp<span class="logo-accent">AR</span></span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#comparison">Benchmarks</a>
+                <a href="#code">Code</a>
+                <a href="https://github.com/srsergiolazaro/taptapp-ar" target="_blank" class="nav-github">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    Star
+                </a>
+            </div>
+            <button class="nav-toggle" id="nav-toggle">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-icon">⚡</span>
+                <span>Protocol V11 — Nanite Vision Codec</span>
+            </div>
+            <h1 class="hero-title">
+                <span class="title-line">The Future of AR</span>
+                <span class="title-line title-gradient">is Pure JavaScript</span>
+            </h1>
+            <p class="hero-subtitle">
+                High-performance Augmented Reality toolkit with <strong>zero TensorFlow dependency</strong>.
+                Ultra-fast compilation, tiny file sizes, and instant tracking — all in vanilla JS.
+            </p>
+            <div class="hero-cta">
+                <a href="#code" class="btn btn-primary">
+                    <span>Get Started</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                </a>
+                <a href="https://github.com/srsergiolazaro/taptapp-ar" target="_blank" class="btn btn-secondary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    <span>View on GitHub</span>
+                </a>
+            </div>
+            <div class="hero-install">
+                <div class="install-box" id="install-box">
+                    <code>npm install @srsergio/taptapp-ar</code>
+                    <button class="copy-btn" id="copy-btn" aria-label="Copy to clipboard">
+                        <svg class="icon-copy" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                        </svg>
+                        <svg class="icon-check" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="floating-phone">
+                <div class="phone-frame">
+                    <div class="phone-screen">
+                        <div class="ar-overlay">
+                            <div class="ar-grid"></div>
+                            <div class="ar-target"></div>
+                            <div class="ar-points">
+                                <span class="point p1"></span>
+                                <span class="point p2"></span>
+                                <span class="point p3"></span>
+                                <span class="point p4"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="floating-elements">
+                    <div class="float-card fc1">
+                        <span class="fc-icon">🚀</span>
+                        <span class="fc-text">14x Faster</span>
+                    </div>
+                    <div class="float-card fc2">
+                        <span class="fc-icon">📦</span>
+                        <span class="fc-text">~100KB</span>
+                    </div>
+                    <div class="float-card fc3">
+                        <span class="fc-icon">⚡</span>
+                        <span class="fc-text">Zero TFJS</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-scroll">
+            <span>Scroll to explore</span>
+            <div class="scroll-indicator"></div>
+        </div>
+    </section>
+
+    <!-- Metrics Banner -->
+    <section class="metrics" id="metrics">
+        <div class="container">
+            <div class="metrics-grid">
+                <div class="metric-card" data-value="14" data-suffix="x">
+                    <span class="metric-value">0</span>
+                    <span class="metric-suffix">x</span>
+                    <span class="metric-label">Faster Compilation</span>
+                </div>
+                <div class="metric-card" data-value="86" data-suffix="%">
+                    <span class="metric-value">0</span>
+                    <span class="metric-suffix">%</span>
+                    <span class="metric-label">Smaller Output</span>
+                </div>
+                <div class="metric-card" data-value="99" data-suffix="%">
+                    <span class="metric-value">0</span>
+                    <span class="metric-suffix">%</span>
+                    <span class="metric-label">Less Dependencies</span>
+                </div>
+                <div class="metric-card" data-value="35" data-suffix="ms">
+                    <span class="metric-value">0</span>
+                    <span class="metric-suffix">ms</span>
+                    <span class="metric-label">Total Pipeline</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Features</span>
+                <h2 class="section-title">Built for the Modern Web</h2>
+                <p class="section-subtitle">Everything you need to create stunning AR experiences, without the bloat.
+                </p>
+            </div>
+            <div class="features-bento">
+                <div class="feature-card fc-large" data-aos="fade-up">
+                    <div class="feature-icon">🎭</div>
+                    <h3>Non-Rigid Tracking</h3>
+                    <p>Track curved and deformable surfaces using Delaunay Meshes and Mass-Spring Relaxation. Perfect
+                        for posters, t-shirts, and curved displays.</p>
+                    <div class="feature-visual mesh-visual"></div>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="feature-icon">⚡</div>
+                    <h3>JIT Compilation</h3>
+                    <p>Pass any image URL and track instantly. No offline compilation required.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="feature-icon">🧬</div>
+                    <h3>Neural Encoding</h3>
+                    <p>Fourier positional encoding (GPT-style) for spatial consistency.</p>
+                </div>
+                <div class="feature-card fc-wide" data-aos="fade-up" data-aos-delay="300">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Nanite-Style Features</h3>
+                    <p>Single-pass multi-octave detection with stratified sampling. Dynamic LOD matching skips
+                        irrelevant octaves, reducing operations by 90%.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="400">
+                    <div class="feature-icon">🧵</div>
+                    <h3>HD Precision</h3>
+                    <p>1280×960 default resolution for superior tracking sharpness.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="500">
+                    <div class="feature-icon">📏</div>
+                    <h3>20% – 1000% Scale</h3>
+                    <p>Extreme scale range from a single keyframe. Track from far to close-up.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="pipeline" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Architecture</span>
+                <h2 class="section-title">How It Works</h2>
+                <p class="section-subtitle">A revolutionary pipeline built for speed and precision.</p>
+            </div>
+            <div class="pipeline-flow">
+                <!-- Animated SVG Pipeline Connector -->
+                <svg class="pipeline-svg" viewBox="0 0 1100 120" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="pipelineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#00d4aa" />
+                            <stop offset="50%" stop-color="#7c3aed" />
+                            <stop offset="100%" stop-color="#ec4899" />
+                        </linearGradient>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                            <feMerge>
+                                <feMergeNode in="coloredBlur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                    </defs>
+                    <!-- Main pipeline path -->
+                    <path
+                        d="M50,60 L200,60 L220,60 L300,60 L320,60 L420,60 L440,60 L540,60 L560,60 L660,60 L680,60 L780,60 L800,60 L900,60 L920,60 L1050,60"
+                        stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" stroke-linecap="round" />
+                    <!-- Animated data flow -->
+                    <circle r="4" fill="#00d4aa" filter="url(#glow)">
+                        <animateMotion dur="3s" repeatCount="indefinite">
+                            <mpath href="#dataPath" />
+                        </animateMotion>
+                    </circle>
+                    <circle r="4" fill="#7c3aed" filter="url(#glow)">
+                        <animateMotion dur="3s" repeatCount="indefinite" begin="1s">
+                            <mpath href="#dataPath" />
+                        </animateMotion>
+                    </circle>
+                    <circle r="4" fill="#ec4899" filter="url(#glow)">
+                        <animateMotion dur="3s" repeatCount="indefinite" begin="2s">
+                            <mpath href="#dataPath" />
+                        </animateMotion>
+                    </circle>
+                    <path id="dataPath"
+                        d="M50,60 L200,60 L220,60 L300,60 L320,60 L420,60 L440,60 L540,60 L560,60 L660,60 L680,60 L780,60 L800,60 L900,60 L920,60 L1050,60"
+                        fill="none" />
+                    <!-- Animated arrows -->
+                    <g class="pipeline-arrows">
+                        <polygon points="210,55 225,60 210,65" fill="#00d4aa" opacity="0.7">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" />
+                        </polygon>
+                        <polygon points="430,55 445,60 430,65" fill="#00d4aa" opacity="0.7">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"
+                                begin="0.3s" />
+                        </polygon>
+                        <polygon points="650,55 665,60 650,65" fill="#7c3aed" opacity="0.7">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"
+                                begin="0.6s" />
+                        </polygon>
+                        <polygon points="870,55 885,60 870,65" fill="#ec4899" opacity="0.7">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"
+                                begin="0.9s" />
+                        </polygon>
+                    </g>
+                </svg>
+
+                <div class="pipeline-steps-row">
+                    <div class="pipeline-step" data-aos="fade-right">
+                        <div class="step-icon">📷</div>
+                        <div class="step-content">
+                            <h4>Camera Input</h4>
+                            <p>HD video stream at 1280×960</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="pipeline-step" data-aos="fade-right" data-aos-delay="100">
+                        <div class="step-icon">🔍</div>
+                        <div class="step-content">
+                            <h4>Feature Detection</h4>
+                            <p>Gaussian pyramid + FREAK descriptors</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="pipeline-step" data-aos="fade-right" data-aos-delay="200">
+                        <div class="step-icon">🔗</div>
+                        <div class="step-content">
+                            <h4>Binary Matching</h4>
+                            <p>LSH + Hamming distance with popcount</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="pipeline-step" data-aos="fade-right" data-aos-delay="300">
+                        <div class="step-icon">📐</div>
+                        <div class="step-content">
+                            <h4>Pose Estimation</h4>
+                            <p>RANSAC + homography refinement</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="pipeline-step" data-aos="fade-right" data-aos-delay="400">
+                        <div class="step-icon">✨</div>
+                        <div class="step-content">
+                            <h4>AR Overlay</h4>
+                            <p>Transform matrix → DOM/Canvas/WebGL</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="comparison" id="comparison">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Benchmarks</span>
+                <h2 class="section-title">Industry-Leading Performance</h2>
+                <p class="section-subtitle">Real numbers. Real improvements. No asterisks.</p>
+            </div>
+            <div class="comparison-table">
+                <div class="compare-row compare-header">
+                    <div class="compare-cell">Metric</div>
+                    <div class="compare-cell">MindAR (TFJS)</div>
+                    <div class="compare-cell highlight">TapTapp AR V11</div>
+                </div>
+                <div class="compare-row" data-aos="fade-up">
+                    <div class="compare-cell label">Compilation Time</div>
+                    <div class="compare-cell old">~23.50s</div>
+                    <div class="compare-cell new">~1.69s <span class="badge-win">🚀 14x</span></div>
+                </div>
+                <div class="compare-row" data-aos="fade-up" data-aos-delay="50">
+                    <div class="compare-cell label">Output Size</div>
+                    <div class="compare-cell old">~770 KB</div>
+                    <div class="compare-cell new">~103 KB <span class="badge-win">📉 86%</span></div>
+                </div>
+                <div class="compare-row" data-aos="fade-up" data-aos-delay="100">
+                    <div class="compare-cell label">Dependency Size</div>
+                    <div class="compare-cell old">~20 MB</div>
+                    <div class="compare-cell new">&lt;100 KB <span class="badge-win">📦 99%</span></div>
+                </div>
+                <div class="compare-row" data-aos="fade-up" data-aos-delay="150">
+                    <div class="compare-cell label">Matching Logic</div>
+                    <div class="compare-cell old">Brute-force</div>
+                    <div class="compare-cell new">Nanite LOD <span class="badge-win">🧠</span></div>
+                </div>
+                <div class="compare-row" data-aos="fade-up" data-aos-delay="200">
+                    <div class="compare-cell label">Tracking Data</div>
+                    <div class="compare-cell old">8-bit Gray</div>
+                    <div class="compare-cell new">4-bit Packed <span class="badge-win">50%</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Demo Section -->
+    <section class="code-demo" id="code">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Quick Start</span>
+                <h2 class="section-title">Get Started in Seconds</h2>
+                <p class="section-subtitle">Just 3 lines of code to unlock powerful AR.</p>
+            </div>
+            <div class="code-tabs">
+                <button class="code-tab active" data-tab="react">React</button>
+                <button class="code-tab" data-tab="vanilla">Vanilla JS</button>
+            </div>
+            <div class="code-container">
+                <div class="code-block active" id="code-react">
+                    <div class="code-header">
+                        <span class="code-filename">App.tsx</span>
+                        <button class="code-copy" data-code="react">Copy</button>
+                    </div>
+                    <pre><code><span class="keyword">import</span> { TaptappAR } <span class="keyword">from</span> <span class="string">'@srsergio/taptapp-ar/react'</span>;
+
+<span class="keyword">export const</span> <span class="function">MyARScene</span> = () => (
+  <span class="tag">&lt;TaptappAR</span>
+    <span class="attr">config</span>={{
+      <span class="attr">targetImageSrc</span>: <span class="string">"https://example.com/target.jpg"</span>,
+      <span class="attr">videoSrc</span>: <span class="string">"https://example.com/overlay.mp4"</span>,
+      <span class="attr">scale</span>: <span class="number">1.2</span>
+    }}
+  <span class="tag">/&gt;</span>
+);</code></pre>
+                </div>
+                <div class="code-block" id="code-vanilla">
+                    <div class="code-header">
+                        <span class="code-filename">app.js</span>
+                        <button class="code-copy" data-code="vanilla">Copy</button>
+                    </div>
+                    <pre><code><span class="keyword">import</span> { startTracking } <span class="keyword">from</span> <span class="string">'@srsergio/taptapp-ar'</span>;
+
+<span class="keyword">const</span> tracker = <span class="keyword">await</span> <span class="function">startTracking</span>({
+  <span class="attr">targetSrc</span>: <span class="string">'./my-image.jpg'</span>,  <span class="comment">// JIT compiles automatically!</span>
+  <span class="attr">container</span>: document.<span class="function">getElementById</span>(<span class="string">'ar-container'</span>),
+  <span class="attr">overlay</span>: document.<span class="function">getElementById</span>(<span class="string">'overlay'</span>),
+  <span class="attr">callbacks</span>: {
+    <span class="function">onFound</span>: () => console.<span class="function">log</span>(<span class="string">"Target Found!"</span>),
+    <span class="function">onUpdate</span>: (data) => console.<span class="function">log</span>(data.avgStability)
+  }
+});</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Visual Search Section -->
+    <section class="embeddings" id="embeddings">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">NEW</span>
+                <h2 class="section-title">Visual Search & Embeddings</h2>
+                <p class="section-subtitle">Convert images to vectors for AI-powered search, clustering, and
+                    deduplication.</p>
+            </div>
+            <div class="embeddings-grid">
+                <div class="embedding-card" data-aos="zoom-in">
+                    <div class="embed-mode">micro</div>
+                    <div class="embed-size">4 Bytes</div>
+                    <div class="embed-speed">10M+ ops/s</div>
+                </div>
+                <div class="embedding-card featured" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="embed-badge">🏆 Recommended</div>
+                    <div class="embed-mode">compact</div>
+                    <div class="embed-size">16 Bytes</div>
+                    <div class="embed-speed">44M+ ops/s</div>
+                </div>
+                <div class="embedding-card" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="embed-mode">standard</div>
+                    <div class="embed-size">32 Bytes</div>
+                    <div class="embed-speed">18M+ ops/s</div>
+                </div>
+                <div class="embedding-card" data-aos="zoom-in" data-aos-delay="300">
+                    <div class="embed-mode">full</div>
+                    <div class="embed-size">128 Bytes</div>
+                    <div class="embed-speed">7M+ ops/s</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta" id="cta">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Ready to Build the Future?</h2>
+                <p>Join developers worldwide using TapTapp AR to create next-generation AR experiences.</p>
+                <div class="cta-install">
+                    <code>npm install @srsergio/taptapp-ar</code>
+                </div>
+                <div class="cta-buttons">
+                    <a href="https://github.com/srsergiolazaro/taptapp-ar" target="_blank"
+                        class="btn btn-primary btn-large">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                        </svg>
+                        Star on GitHub
+                    </a>
+                    <a href="https://www.npmjs.com/package/@srsergio/taptapp-ar" target="_blank"
+                        class="btn btn-secondary btn-large">
+                        View on npm
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo-icon">🎯</span>
+                    <span>TapTapp AR</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/srsergiolazaro/taptapp-ar" target="_blank">GitHub</a>
+                    <a href="https://www.npmjs.com/package/@srsergio/taptapp-ar" target="_blank">npm</a>
+                    <a href="https://github.com/srsergiolazaro/taptapp-ar/blob/main/LICENSE" target="_blank">License</a>
+                </div>
+                <div class="footer-copy">
+                    <p>Fair Source License v0.9 © <a href="https://github.com/srsergiolazaro"
+                            target="_blank">srsergiolazaro</a></p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
