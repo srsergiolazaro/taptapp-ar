@@ -1,11 +1,23 @@
-# @srsergio/taptapp-ar
+<div align="center">
+  
+# 🎯 @srsergio/taptapp-ar
 
-[![npm version](https://img.shields.io/npm/v/@srsergio/taptapp-ar.svg?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
-[![npm downloads](https://img.shields.io/npm/dm/@srsergio/taptapp-ar.svg?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
+<img src="./docs/images/hero-banner.png" alt="TapTapp AR - High Performance Augmented Reality" width="100%"/>
+
+[![npm version](https://img.shields.io/npm/v/@srsergio/taptapp-ar.svg?style=flat-square&color=00D4AA)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
+[![npm downloads](https://img.shields.io/npm/dm/@srsergio/taptapp-ar.svg?style=flat-square&color=7C3AED)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
 [![License: Fair Source-0.9](https://img.shields.io/badge/License-Fair_Source--0.9-blue.svg?style=flat-square)](./LICENSE)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@srsergio/taptapp-ar?style=flat-square)](https://bundlephobia.com/package/@srsergio/taptapp-ar)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@srsergio/taptapp-ar?style=flat-square&color=F59E0B)](https://bundlephobia.com/package/@srsergio/taptapp-ar)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero_TFJS-22C55E?style=flat-square)](https://www.npmjs.com/package/@srsergio/taptapp-ar)
 
-🚀 **TapTapp AR** is a high-performance Augmented Reality (AR) toolkit for **Node.js** and **Browser** environments. It provides an ultra-fast offline compiler and a lightweight runtime for image tracking.
+### 🚀 Ultra-Fast AR Tracking • 100% Pure JavaScript • No TensorFlow Required
+
+</div>
+
+---
+
+**TapTapp AR** is a high-performance Augmented Reality (AR) toolkit for **Node.js** and **Browser** environments. It provides an ultra-fast offline compiler and a lightweight runtime for image tracking.
 
 **100% Pure JavaScript**: This package is now completely independent of **TensorFlow.js** for both compilation and real-time tracking, resulting in massive performance gains and zero-latency initialization.
 
@@ -30,21 +42,22 @@
 
 ## 🌟 Key Features
 
-- 🎭 **Non-Rigid Surface Tracking**: Supports curved and deformable surfaces using **Delaunay Meshes** and **Mass-Spring Relaxation**.
-- 🚀 **Nanite-style Virtualized Features**: Single-pass multi-octave detection with stratified sampling.
-- ⚡ **No TensorFlow Dependency**: No TFJS at all. Works natively in any JS environment (Node, Browser, Workers).
-- 🧬 **Fourier Positional Encoding**: Uses high-frequency sine/cosine mappings (GPT-style) for neural-like spatial consistency.
-- 🚀 **Protocol V11 (Nanite)**: 
-  - **Stratified Multi-Octave Sampling**: 300 reliable features per octave, capped at 1,200 total per target.
-  - **Dynamic Scale Filtering (LOD)**: Runtime matching engine skips irrelevant octaves based on estimated scale.
-  - **4-bit Packed Tracking Data**: Grayscale images are compressed to 4-bit depth, slashing file size.
-  - **64-bit LSH Descriptors**: Optimized Locality Sensitive Hashing with XOR folding support.
-- 🧵 **HD Precision Tracking**: Default resolution upgraded to **1280x960 (HD)** for superior sharpness on modern displays.
-- ⚡ **Zero-Config JIT Compilation**: No need for offline tools. Just pass an image URL and the engine compiles it on the fly.
-- 📏 **Virtualized Scale Range**: Stable tracking from **20% (distant targets)** to **1000% (close-up)** using a single high-res keyframe.
-- ⚡ **Immediate AR Detection**: Optimized "warm-up" period (15 frames) with relaxed inlier thresholds (6 pts) for instant tracking lock.
-- 📦 **Framework Agnostic**: Includes wrappers for **React**, **A-Frame**, **Three.js**, and a raw **Controller**.
-- 📉 **Ultra-Compact Files**: Output `.taar` files are now **~100KB** (vs ~380KB+ previously).
+<div align="center">
+  <img src="./docs/images/features-grid.png" alt="TapTapp AR Key Features" width="600"/>
+</div>
+
+<br/>
+
+| Feature | Description |
+|---------|-------------|
+| 🎭 **Non-Rigid Tracking** | Curved & deformable surfaces with Delaunay Meshes |
+| 🚀 **Nanite-style Features** | Single-pass multi-octave detection |
+| ⚡ **Zero Dependencies** | No TensorFlow.js - Pure JavaScript |
+| 🧬 **Neural Encoding** | Fourier positional encoding (GPT-style) |
+| 🧵 **HD Precision** | 1280x960 default resolution |
+| ⚡ **JIT Compilation** | Pass an image URL, track instantly |
+| 📏 **20% - 1000% Scale** | Extreme scale range from a single keyframe |
+| 📦 **~100KB Output** | Ultra-compact `.taar` files |
 
 ---
 
@@ -57,6 +70,12 @@ npm install @srsergio/taptapp-ar
 ---
 
 ## 📊 Industry-Leading Benchmarks (v7 Moonshot)
+
+<div align="center">
+  <img src="./docs/images/performance-chart.png" alt="Performance Comparison" width="500"/>
+</div>
+
+<br/>
 
 | Metric | Official MindAR | TapTapp AR V11 | Improvement |
 | :--- | :--- | :--- | :--- |
@@ -129,6 +148,12 @@ const tracker = await startTracking({
 ---
 
 ## 🎥 Runtime Usage (AR Tracking)
+
+<div align="center">
+  <img src="./docs/images/ar-tracking-demo.png" alt="AR Tracking Pipeline" width="700"/>
+</div>
+
+<br/>
 
 ### 1. The Easy Way: React Component ⚛️
 
@@ -256,6 +281,13 @@ import { TaarThree } from '@srsergio/taptapp-ar';
 ---
 
 ## 🏗️ Protocol V11 (Nanite Virtualized Format)
+
+<div align="center">
+  <img src="./docs/images/architecture-flow.png" alt="Architecture Pipeline" width="700"/>
+</div>
+
+<br/>
+
 TapTapp AR uses a proprietary **Nanite-style Vision Codec** that is significantly more efficient than standard AR formats.
 
 - **Virtualized Multi-Octave Features**: Instead of storing redundant images for each scale, V11 stores a single high-res keyframe with features stratified across 6 octaves.
@@ -270,7 +302,13 @@ TapTapp AR uses a proprietary **Nanite-style Vision Codec** that is significantl
 
 ---
 
-## � Visual Search & Embeddings (NEW!) 🚀
+## 🔍 Visual Search & Embeddings (NEW!) 🚀
+
+<div align="center">
+  <img src="./docs/images/visual-search.png" alt="Visual Search & Embeddings" width="600"/>
+</div>
+
+<br/>
 
 TapTapp AR now includes a state-of-the-art **Image Embedding** system based on Hyperdimensional Computing (HDC). This allows you to convert any image into a tiny mathematical fingerprint (vector) for ultra-fast visual search, deduplication, and clustering.
 
