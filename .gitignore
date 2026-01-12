@@ -5,3 +5,5 @@ dist/
 .env
 tests/robustness-images/*
 tests/assets/*
+docs/technical-paper.out
+docs/technical-paper.aux
