@@ -1,6 +1,6 @@
 export default {
     server: {
-        allowedHosts: ["testroute.taptapp.xyz", "macastro.taptapp.xyz", "astro.taptapp.xyz"],
+        allowedHosts: true,
         fs: {
             allow: [
                 '.',

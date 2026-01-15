@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>LOCUS AR - Registro y Prueba de Target | Demo 2</title>
     <meta name="description"
         content="Demo interactiva para registrar un target con la cámara y probar el tracking de LOCUS.">
@@ -36,17 +36,18 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
         .nav-bar {
+            width: 100%;
+            padding: 1.2rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.5rem;
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(15, 23, 42, 0.8);
             backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             z-index: 100;
         }
 
@@ -63,18 +64,19 @@
 
         .main-container {
             flex: 1;
-            position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             padding: 1rem;
+            padding-bottom: 120px;
+            /* Space for sticky controls */
         }
 
         .video-container {
             width: 100%;
             max-width: 640px;
-            aspect-ratio: 4/3;
+            aspect-ratio: 4 / 3;
+            /* Fixed to match processing resolution */
             background: #000;
             border-radius: 20px;
             border: 2px solid rgba(255, 255, 255, 0.1);
@@ -83,13 +85,47 @@
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
         }
 
-        video,
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* This crops high-res video to match our 4:3 container */
+            z-index: 1;
+        }
+
         canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            object-fit: cover;
+        }
+
+        #arCanvas {
+            display: none;
+            /* Hide low-res processing canvas */
+        }
+
+        #debugCanvas {
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        #capture-preview {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            width: 120px;
+            height: 90px;
+            border: 2px solid var(--locus-accent);
+            border-radius: 8px;
+            background: #000;
+            z-index: 10;
+            display: none;
             object-fit: cover;
         }
 
@@ -103,10 +139,17 @@
         }
 
         .controls {
-            position: absolute;
-            bottom: 2rem;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             display: flex;
+            flex-direction: column;
+            align-items: center;
             gap: 1rem;
+            padding: 1.5rem;
+            padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+            background: linear-gradient(to top, var(--locus-darker) 30%, transparent 100%);
             z-index: 100;
         }
 
@@ -133,60 +176,43 @@
             box-shadow: 0 6px 25px rgba(99, 102, 241, 0.6);
         }
 
+        .btn-pulse {
+            animation: buttonPulse 2s infinite;
+        }
+
+        @keyframes buttonPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(99, 102, 241, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+            }
+        }
+
+        .instructions {
+            margin: 1rem 0;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--locus-accent);
+            text-align: center;
+            z-index: 90;
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
             color: #fff;
             backdrop-filter: blur(5px);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status-panel {
-            position: absolute;
-            top: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 10px 20px;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--locus-gray);
-        }
-
-        .status-dot.active {
-            background: var(--locus-success);
-            animation: pulse 1.5s infinite;
-        }
-
-        #logs {
-            position: absolute;
-            bottom: 1rem;
-            left: 1rem;
-            right: 1rem;
-            height: 80px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 10px;
-            padding: 10px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--locus-success);
-            overflow-y: auto;
-            pointer-events: none;
-            opacity: 0.7;
         }
 
         @keyframes pulse {
@@ -235,28 +261,24 @@
         <div style="width: 60px;"></div>
     </nav>
 
-    <div class="main-container">
-        <div class="status-panel">
-            <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Inicializando cámara...</span>
-        </div>
+    <main class="main-container">
 
         <div class="video-container" id="ar-container">
             <video id="video" autoplay playsinline muted></video>
             <canvas id="arCanvas"></canvas>
+            <canvas id="debugCanvas"></canvas>
             <div id="scan-line" class="scan-line"></div>
             <img id="overlay-img" src="logo.png" alt="Overlay">
+            <img id="capture-preview" src="" alt="Capture Preview">
         </div>
+
+        <div id="instruction-text" class="instructions">Paso 1: Enfoca el objeto y pulsa "Capturar"</div>
 
         <div class="controls">
-            <button id="btn-register" class="btn btn-primary">Registrar Target</button>
-            <button id="btn-capture" class="btn btn-primary" style="display: none;">Capturar</button>
-            <button id="btn-test" class="btn btn-primary" style="display: none;">Probar</button>
-            <button id="btn-reset" class="btn btn-secondary" style="display: none;">Reiniciar</button>
+            <button id="btn-capture" class="btn btn-primary btn-pulse">Capturar Target</button>
+            <button id="btn-reset" class="btn btn-secondary" style="display: none;">Reiniciar Demo</button>
         </div>
-
-        <div id="logs">Esperando interacción del usuario...</div>
-    </div>
+    </main>
 
     <script type="module" src="./demo2-app.js"></script>
 </body>

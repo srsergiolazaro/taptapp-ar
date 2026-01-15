@@ -8,72 +8,111 @@ const HEIGHT = AR_CONFIG.VIEWPORT_HEIGHT;
 
 const video = document.getElementById('video') as HTMLVideoElement;
 const arCanvas = document.getElementById('arCanvas') as HTMLCanvasElement;
+const debugCanvas = document.getElementById('debugCanvas') as HTMLCanvasElement;
 const arCtx = arCanvas.getContext('2d')!;
-const statusText = document.getElementById('status-text')!;
-const statusDot = document.getElementById('status-dot')!;
-const logs = document.getElementById('logs')!;
-const btnRegister = document.getElementById('btn-register') as HTMLButtonElement;
+const debugCtx = debugCanvas.getContext('2d')!;
 const btnCapture = document.getElementById('btn-capture') as HTMLButtonElement;
-const btnTest = document.getElementById('btn-test') as HTMLButtonElement;
 const btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 const scanLine = document.getElementById('scan-line')!;
 const overlayImg = document.getElementById('overlay-img') as HTMLImageElement;
+const capturePreview = document.getElementById('capture-preview') as HTMLImageElement;
 const arContainer = document.getElementById('ar-container')!;
+
+// Initialize canvas sizes
+arCanvas.width = WIDTH;
+arCanvas.height = HEIGHT;
 
 let controller: BioInspiredController | null = null;
 let captureCanvas: HTMLCanvasElement | null = null;
 let isTesting = false;
 
 function log(msg: string) {
-    const div = document.createElement('div');
-    div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    logs.insertBefore(div, logs.firstChild);
+    // Silenced for a cleaner UI
+    console.log(`[AR LOG] ${msg}`);
 }
+
+const instructionText = document.getElementById('instruction-text')!;
+
+video.onloadedmetadata = () => {
+    log(`Cámara: ${video.videoWidth}x${video.videoHeight}`);
+
+    // Adjust debug canvas to match container's physical size for high-res drawing
+    const dpr = window.devicePixelRatio || 1;
+    const rect = arContainer.getBoundingClientRect();
+    debugCanvas.width = rect.width * dpr;
+    debugCanvas.height = rect.height * dpr;
+
+    // Direct transition to capture-ready state
+    btnCapture.style.display = 'block'; // Ensure capture button is visible
+    btnCapture.classList.add('btn-pulse'); // Add pulse animation
+    scanLine.style.display = 'block'; // Show scan line
+    instructionText.textContent = 'Paso 1: Enmarca el objeto y haz clic en "Capturar"';
+};
 
 async function startCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment', width: 640, height: 480 }
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
         });
         video.srcObject = stream;
-        statusText.textContent = 'Cámara lista. Registra un target.';
         log('Cámara iniciada correctamente.');
     } catch (err) {
         log('Error al acceder a la cámara: ' + err);
-        statusText.textContent = 'Error de cámara.';
     }
 }
 
-btnRegister.onclick = () => {
-    btnRegister.style.display = 'none';
-    btnCapture.style.display = 'block';
-    scanLine.style.display = 'block';
-    statusText.textContent = 'Enmarca el objeto y captura.';
-    log('Modo registro activo.');
-};
+function drawVideoToCanvas(ctx: CanvasRenderingContext2D, videoElement: HTMLVideoElement, targetWidth: number, targetHeight: number) {
+    const videoWidth = videoElement.videoWidth;
+    const videoHeight = videoElement.videoHeight;
+    const videoRatio = videoWidth / videoHeight;
+    const targetRatio = targetWidth / targetHeight;
+
+    let sx, sy, sw, sh;
+
+    if (videoRatio > targetRatio) {
+        // Video is wider than canvas (landscape vs portrait-ish)
+        sh = videoHeight;
+        sw = sh * targetRatio;
+        sx = (videoWidth - sw) / 2;
+        sy = 0;
+    } else {
+        // Video is taller than canvas (portrait vs landscape-ish)
+        sw = videoWidth;
+        sh = sw / targetRatio;
+        sx = 0;
+        sy = (videoHeight - sh) / 2;
+    }
+
+    ctx.drawImage(videoElement, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+}
 
 btnCapture.onclick = async () => {
     btnCapture.disabled = true;
-    statusText.textContent = 'Capturando y procesando...';
+    btnCapture.classList.remove('btn-pulse');
+    instructionText.textContent = 'Procesando imagen... un momento';
     log('Capturando frame...');
 
-    // Capture current frame
+    // Capture current frame with aspect ratio fix
     captureCanvas = document.createElement('canvas');
     captureCanvas.width = WIDTH;
     captureCanvas.height = HEIGHT;
     const ctx = captureCanvas.getContext('2d')!;
-    ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+
+    drawVideoToCanvas(ctx, video, WIDTH, HEIGHT);
+
+    // Show preview
+    capturePreview.src = captureCanvas.toDataURL();
+    capturePreview.style.display = 'block';
 
     log('Compilando target al vuelo...');
     const compiler = new OfflineCompiler();
-    const imageData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
 
     try {
         const compiledData = await compiler.compileImageTargets([
             {
                 width: WIDTH,
                 height: HEIGHT,
-                data: imageData.data
+                data: ctx.getImageData(0, 0, WIDTH, HEIGHT).data
             }
         ], (p) => {
             if (Math.round(p) % 20 === 0) log(`Progreso: ${Math.round(p)}%`);
@@ -92,49 +131,100 @@ btnCapture.onclick = async () => {
 
         await controller.addImageTargetsFromBuffer(cleanBuffer);
 
-        log('Target registrado con éxito.',);
-        statusText.textContent = 'Colocar imagen';
+        log('Target registrado con éxito. Iniciando tracking automáticamente.');
         btnCapture.style.display = 'none';
-        btnTest.style.display = 'block';
+        btnReset.style.display = 'block';
         scanLine.style.display = 'none';
+        instructionText.style.opacity = '0';
+
+        isTesting = true;
+        overlayImg.style.display = 'block';
+        startProcessingLoop();
+
     } catch (e) {
         log('Error en compilación: ' + e);
         btnCapture.disabled = false;
+        instructionText.textContent = 'Error. Intenta capturar de nuevo.';
     }
 };
 
-btnTest.onclick = () => {
-    isTesting = true;
-    btnTest.style.display = 'none';
-    btnReset.style.display = 'block';
-    statusText.textContent = 'Probando tracking...';
-    overlayImg.style.display = 'block';
-    log('Iniciando motor de tracking.');
+function startProcessingLoop() {
+    if (!controller || !isTesting) return;
 
-    if (controller) {
-        controller.processVideo(video);
+    function processFrame() {
+        if (!isTesting) return;
+
+        // Feed corrected frame to arCanvas so controller can see it
+        drawVideoToCanvas(arCtx, video, WIDTH, HEIGHT);
+
+        // The controller normally calls processVideo which does internal polling on a canvas.
+        // But since we are manually drawing to arCanvas to fix aspect ratio,
+        // we can just call processVideo(arCanvas) once and it will keep looking at it.
+        // Actually, BioInspiredController.processVideo(canvas) starts an internal loop.
+        // So we just need to keep updating that canvas.
+
+        requestAnimationFrame(processFrame);
     }
-};
+
+    controller.processVideo(arCanvas);
+    processFrame();
+}
 
 btnReset.onclick = () => {
     location.reload();
 };
 
 function handleARUpdate(data: any, markerW: number, markerH: number) {
+    if (data.type === 'processDone') return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const scaleX = debugCanvas.width / WIDTH;
+    const scaleY = debugCanvas.height / HEIGHT;
+
+    // Clear debug canvas
+    if (data.type === 'featurePoints' || data.type === 'updateMatrix') {
+        debugCtx.clearRect(0, 0, debugCanvas.width, debugCanvas.height);
+    }
+
+    if (data.type === 'featurePoints') {
+        const { featurePoints } = data;
+        if (featurePoints && !isTesting) {
+            drawFeaturePoints(featurePoints, scaleX, scaleY);
+        }
+    }
+
     if (data.type === 'updateMatrix') {
-        const { worldMatrix, modelViewTransform } = data;
+        const { worldMatrix, modelViewTransform, screenCoords } = data;
+
+        if (screenCoords && screenCoords.length > 0) {
+            drawTrackingPoints(screenCoords, scaleX, scaleY);
+        }
 
         if (worldMatrix && isTesting) {
-            statusDot.classList.add('active');
-            statusText.textContent = 'TRACKING ACTIVO';
             positionOverlay(modelViewTransform, markerW, markerH);
         } else {
-            statusDot.classList.remove('active');
             if (isTesting) {
-                statusText.textContent = 'Buscando target...';
                 overlayImg.style.display = 'none';
             }
         }
+    }
+}
+
+function drawFeaturePoints(points: any[], sx: number, sy: number) {
+    debugCtx.fillStyle = 'rgba(255, 255, 0, 0.6)';
+    const limit = Math.min(points.length, 150);
+    for (let i = 0; i < limit; i++) {
+        const p = points[i];
+        debugCtx.fillRect(p.x * sx - 1, p.y * sy - 1, 2, 2);
+    }
+}
+
+function drawTrackingPoints(coords: any[], sx: number, sy: number) {
+    debugCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+    const limit = Math.min(coords.length, 100);
+    for (let i = 0; i < limit; i++) {
+        const p = coords[i];
+        debugCtx.fillRect(p.x * sx - 1.5, p.y * sy - 1.5, 3, 3);
     }
 }
 
