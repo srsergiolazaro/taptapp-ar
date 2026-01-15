@@ -1,3 +1,4 @@
+console.log('[AR] Script demo2-app.ts iniciado');
 import { BioInspiredController } from '../src/runtime/bio-inspired-controller.js';
 import { OfflineCompiler } from '../src/compiler/offline-compiler.js';
 import { projectToScreen } from '../src/core/utils/projection.js';
@@ -17,6 +18,28 @@ const scanLine = document.getElementById('scan-line')!;
 const overlayImg = document.getElementById('overlay-img') as HTMLImageElement;
 const capturePreview = document.getElementById('capture-preview') as HTMLImageElement;
 const arContainer = document.getElementById('ar-container')!;
+/*
+// stats.js integration
+let stats: any = null;
+try {
+    if ((window as any).Stats) {
+        stats = new (window as any).Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = 'absolute';
+        stats.dom.style.top = '20px';
+        stats.dom.style.right = '20px';
+        stats.dom.style.left = 'auto';
+        stats.dom.style.zIndex = '10000';
+        document.body.appendChild(stats.dom);
+        console.log('[AR] stats.js inicializado correctamente');
+    } else {
+        console.warn('[AR] stats.js no encontrado en window');
+    }
+} catch (e) {
+    console.error('[AR] Error inicializando stats.js:', e);
+}
+*/
+let stats: any = null;
 
 // Initialize canvas sizes
 arCanvas.width = WIDTH;
@@ -147,27 +170,19 @@ btnCapture.onclick = async () => {
         instructionText.textContent = 'Error. Intenta capturar de nuevo.';
     }
 };
-
 function startProcessingLoop() {
     if (!controller || !isTesting) return;
 
     function processFrame() {
         if (!isTesting) return;
-
-        // Feed corrected frame to arCanvas so controller can see it
         drawVideoToCanvas(arCtx, video, WIDTH, HEIGHT);
-
-        // The controller normally calls processVideo which does internal polling on a canvas.
-        // But since we are manually drawing to arCanvas to fix aspect ratio,
-        // we can just call processVideo(arCanvas) once and it will keep looking at it.
-        // Actually, BioInspiredController.processVideo(canvas) starts an internal loop.
-        // So we just need to keep updating that canvas.
-
         requestAnimationFrame(processFrame);
     }
 
-    controller.processVideo(arCanvas);
-    processFrame();
+    if (controller) {
+        controller.processVideo(arCanvas);
+        processFrame();
+    }
 }
 
 btnReset.onclick = () => {
@@ -175,6 +190,11 @@ btnReset.onclick = () => {
 };
 
 function handleARUpdate(data: any, markerW: number, markerH: number) {
+    // Treat processDone or updateMatrix as a "frame completed" for Stats
+    if (stats && (data.type === 'processDone' || data.type === 'updateMatrix')) {
+        stats.update();
+    }
+
     if (data.type === 'processDone') return;
 
     const dpr = window.devicePixelRatio || 1;
