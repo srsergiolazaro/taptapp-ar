@@ -307,7 +307,7 @@
         .problem-grid {
             display: grid;
             gap: 1.5rem;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
         }
 
@@ -343,7 +343,7 @@
         }
 
         .comparison {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             border-radius: 20px;
             overflow: hidden;
@@ -396,7 +396,7 @@
         }
 
         .traction-chart {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.03);
             border-radius: 20px;
@@ -438,28 +438,78 @@
 
         .traction-stats {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-top: 1.5rem;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 3rem;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
         }
 
         .traction-stat {
-            text-align: center;
-            padding: 1rem;
-            background: rgba(99, 102, 241, 0.1);
-            border-radius: 12px;
+            position: relative;
+            padding: 2.5rem 2rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            text-align: left;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .traction-stat:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            background: rgba(99, 102, 241, 0.05);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
         }
 
         .traction-stat .value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--locus-primary-light);
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            line-height: 1;
         }
 
         .traction-stat .label {
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             color: var(--locus-gray);
-            margin-top: 0.25rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .traction-stat::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+            transition: all 0.4s ease;
+        }
+
+        .traction-stat:hover::after {
+            top: -20%;
+            right: -20%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
+        }
+
+        @media (min-width: 768px) {
+            .traction-stats {
+                grid-template-columns: repeat(4, 1fr);
+            }
         }
 
         /* Features */
@@ -803,13 +853,11 @@
     <nav class="nav">
         <div class="nav-container">
             <a href="index.html" class="logo">
-                <img src="logo.png" alt="LOCUS Logo">
                 <span>LOCUS</span>
             </a>
             <div class="nav-links">
                 <a href="#features">Tecnología</a>
                 <a href="#traction">Tracción</a>
-                <a href="https://github.com/srsergio/taptapp-ar" target="_blank" class="nav-cta">GitHub</a>
             </div>
         </div>
     </nav>
@@ -984,19 +1032,23 @@
             <div class="chart-container">
                 <canvas id="tractionChart"></canvas>
             </div>
-            <div class="traction-stats">
-                <div class="traction-stat">
-                    <div class="value" id="total-downloads">-</div>
-                    <div class="label">Total</div>
-                </div>
-                <div class="traction-stat">
-                    <div class="value" id="avg-downloads">-</div>
-                    <div class="label">Promedio/día</div>
-                </div>
-                <div class="traction-stat">
-                    <div class="value" id="peak-downloads">-</div>
-                    <div class="label">Pico diario</div>
-                </div>
+        </div>
+        <div class="traction-stats">
+            <div class="traction-stat">
+                <div class="value" id="total-downloads">-</div>
+                <div class="label">Total Descargas</div>
+            </div>
+            <div class="traction-stat">
+                <div class="value" id="avg-downloads">-</div>
+                <div class="label">Promedio Diario</div>
+            </div>
+            <div class="traction-stat">
+                <div class="value" id="peak-downloads">-</div>
+                <div class="label">Pico de Tracción</div>
+            </div>
+            <div class="traction-stat">
+                <div class="value">&lt;100KB</div>
+                <div class="label">Bundle Size</div>
             </div>
         </div>
     </section>
