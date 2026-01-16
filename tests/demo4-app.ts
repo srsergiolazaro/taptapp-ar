@@ -211,8 +211,13 @@ async function loadTargets() {
 btnStart.addEventListener('click', async () => {
     if (targets.length === 0) return;
 
+    // Unlock TTS (Mobile fix)
+    const unlockUtterance = new SpeechSynthesisUtterance('');
+    window.speechSynthesis.speak(unlockUtterance);
+
     btnStart.disabled = true;
     btnStart.textContent = '⏳ Compilando...';
+
 
     // Stop setup camera
     const stream = captureVideo.srcObject as MediaStream;
@@ -403,6 +408,7 @@ function handleARUpdate(data: any, texts: string[]) {
             if (now - targetDetectionTimes[targetIndex]! >= 1000 && targetLastSpokenText[targetIndex] === texts[targetIndex]) {
                 // TTS Logic
                 const textToSpeak = texts[targetIndex];
+                console.log(`[Demo4] Triggering TTS for target ${targetIndex}: "${textToSpeak}"`);
                 triggerTTS(textToSpeak);
 
                 // Show message
@@ -458,18 +464,37 @@ function triggerTTS(text: string) {
     const now = Date.now();
     // Debounce: Don't speak same text within 5 seconds
     if (text === lastSpokenText && now - lastSpeakTime < 5000) {
+        console.log('[Demo4] TTS ignored (debounce same text)');
         return;
     }
     // Don't speak different text too fast (2 sec min gap)
     if (now - lastSpeakTime < 2000) {
+        console.log('[Demo4] TTS ignored (debounce fast switch)');
         return;
     }
 
+    console.log('[Demo4] Speaking:', text);
     lastSpokenText = text;
     lastSpeakTime = now;
 
+    // Cancel previous
+    window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES';
+    // Try to find a Spanish voice
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang.startsWith('es'));
+    if (esVoice) {
+        utterance.voice = esVoice;
+        utterance.lang = esVoice.lang;
+    } else {
+        utterance.lang = 'es-ES';
+    }
+    
+    // Explicitly handle end/error
+    utterance.onend = () => console.log('[Demo4] TTS finished');
+    utterance.onerror = (e) => console.error('[Demo4] TTS error:', e);
+
     window.speechSynthesis.speak(utterance);
 }
 

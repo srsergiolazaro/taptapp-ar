@@ -12999,6 +12999,8 @@ async function loadTargets() {
 }
 btnStart.addEventListener("click", async () => {
   if (targets.length === 0) return;
+  const unlockUtterance = new SpeechSynthesisUtterance("");
+  window.speechSynthesis.speak(unlockUtterance);
   btnStart.disabled = true;
   btnStart.textContent = "\u23F3 Compilando...";
   const stream = captureVideo.srcObject;
@@ -13134,6 +13136,7 @@ function handleARUpdate(data, texts) {
       }
       if (now - targetDetectionTimes[targetIndex] >= 1e3 && targetLastSpokenText[targetIndex] === texts[targetIndex]) {
         const textToSpeak = texts[targetIndex];
+        console.log(`[Demo4] Triggering TTS for target ${targetIndex}: "${textToSpeak}"`);
         triggerTTS(textToSpeak);
         detectedMsg.textContent = textToSpeak;
         detectedMsg.classList.add("visible");
@@ -13155,15 +13158,28 @@ function triggerTTS(text) {
   if (!text) return;
   const now = Date.now();
   if (text === lastSpokenText && now - lastSpeakTime < 5e3) {
+    console.log("[Demo4] TTS ignored (debounce same text)");
     return;
   }
   if (now - lastSpeakTime < 2e3) {
+    console.log("[Demo4] TTS ignored (debounce fast switch)");
     return;
   }
+  console.log("[Demo4] Speaking:", text);
   lastSpokenText = text;
   lastSpeakTime = now;
+  window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "es-ES";
+  const voices = window.speechSynthesis.getVoices();
+  const esVoice = voices.find((v) => v.lang.startsWith("es"));
+  if (esVoice) {
+    utterance.voice = esVoice;
+    utterance.lang = esVoice.lang;
+  } else {
+    utterance.lang = "es-ES";
+  }
+  utterance.onend = () => console.log("[Demo4] TTS finished");
+  utterance.onerror = (e) => console.error("[Demo4] TTS error:", e);
   window.speechSynthesis.speak(utterance);
 }
 function drawVideoToCanvas(ctx, videoElement, targetWidth, targetHeight) {
