@@ -275,10 +275,15 @@
 
         <div id="instruction-text" class="instructions">Paso 1: Enfoca el objeto y pulsa "Capturar"</div>
         
-        <!-- TTS Input for Demo 2 -->
-        <div style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); z-index: 90; width: 80%; max-width: 300px;">
+        <!-- Inputs for Demo 2 -->
+        <div style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); z-index: 90; width: 80%; max-width: 300px; display: flex; flex-direction: column; gap: 8px;">
             <input type="text" id="tts-input" placeholder="Texto a hablar al detectar..." 
-                style="width: 100%; padding: 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.6); color: white; text-align: center;">
+                style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.6); color: white; text-align: center; backdrop-filter: blur(4px);">
+            
+            <label for="overlay-input" style="background: rgba(0,0,0,0.6); color: var(--locus-accent); padding: 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(6, 182, 212, 0.3); cursor: pointer; font-size: 0.9rem; font-weight: 600; backdrop-filter: blur(4px);">
+                🖼️ Cambiar Imagen (Overlay)
+                <input type="file" id="overlay-input" accept="image/*" style="display: none;">
+            </label>
         </div>
 
         <div class="controls">

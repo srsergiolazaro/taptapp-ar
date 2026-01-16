@@ -10058,7 +10058,7 @@ var loopIdCounter = 0;
 var Controller = class {
   inputWidth;
   inputHeight;
-  maxTrack;
+  maxTrack = 1;
   inputLoader;
   markerDimensions = null;
   onUpdate;
@@ -10083,7 +10083,7 @@ var Controller = class {
     inputHeight,
     onUpdate = null,
     debugMode: debugMode2 = false,
-    maxTrack = 1,
+    maxTrack,
     warmupTolerance = null,
     missTolerance = null,
     filterMinCF = null,
@@ -10092,7 +10092,9 @@ var Controller = class {
   }) {
     this.inputWidth = inputWidth;
     this.inputHeight = inputHeight;
-    this.maxTrack = maxTrack;
+    if (maxTrack !== void 0) {
+      this.maxTrack = maxTrack;
+    }
     this.featureManager = new FeatureManager();
     this.featureManager.addFeature(new OneEuroFilterFeature(
       filterMinCF === null ? DEFAULT_FILTER_CUTOFF : filterMinCF,
@@ -10209,6 +10211,7 @@ var Controller = class {
     }
     this.markerDimensions = allDimensions;
     this.matchingDataList = allMatchingData;
+    this.maxTrack = allDimensions.length;
     return { dimensions: allDimensions, matchingDataList: allMatchingData, trackingDataList: allTrackingData };
   }
   addImageTargetsFromBuffer(buffer) {
@@ -11888,17 +11891,17 @@ var BioInspiredController = class extends Controller {
     const startProcessing = async () => {
       while (this.processingVideo) {
         const inputData = this.inputLoader.loadInput(input);
-        const activeTracking = this.trackingStates.find((s) => s.isTracking);
-        const trackingState = activeTracking ? {
+        const activeTrackings = this.trackingStates.filter((s) => s.isTracking);
+        const trackingState = activeTrackings.length === 1 ? {
           isTracking: true,
-          activeOctave: activeTracking.lastOctaveIndex,
+          activeOctave: activeTrackings[0].lastOctaveIndex,
           // Tracked octave index
-          worldMatrix: activeTracking.currentModelViewTransform ? this._flattenMatrix(activeTracking.currentModelViewTransform) : null
+          worldMatrix: activeTrackings[0].currentModelViewTransform ? this._flattenMatrix(activeTrackings[0].currentModelViewTransform) : null
         } : null;
         const bioResult = this.bioEngine.process(inputData, trackingState || void 0);
         this.lastBioResult = bioResult;
-        if (bioResult.skipped && activeTracking?.isTracking) {
-          this._handleSkippedFrame(activeTracking, bioResult);
+        if (bioResult.skipped && activeTrackings.length > 0) {
+          this._handleSkippedFrame(activeTrackings, bioResult);
         } else {
           await this._processWithAttention(input, inputData, bioResult);
         }
@@ -11915,18 +11918,24 @@ var BioInspiredController = class extends Controller {
    * Handle a skipped frame using prediction
    * @private
    */
-  _handleSkippedFrame(trackingState, bioResult) {
-    if (bioResult.prediction && bioResult.prediction.worldMatrix) {
-      trackingState.currentModelViewTransform = this._unflattenMatrix(bioResult.prediction.worldMatrix);
+  _handleSkippedFrame(trackingStates, bioResult) {
+    const hasPrediction = bioResult.prediction && bioResult.prediction.worldMatrix;
+    for (const state of trackingStates) {
+      if (hasPrediction && trackingStates.length === 1) {
+        state.currentModelViewTransform = this._unflattenMatrix(bioResult.prediction.worldMatrix);
+      }
+      const targetIndex = this.trackingStates.indexOf(state);
+      if (targetIndex !== -1) {
+        const worldMatrix = state.currentModelViewTransform ? this._glModelViewMatrix(state.currentModelViewTransform, targetIndex) : null;
+        this.onUpdate?.({
+          type: "updateMatrix",
+          targetIndex,
+          worldMatrix: worldMatrix ? this.featureManager.applyWorldMatrixFilters(targetIndex, worldMatrix, { stability: 0.9 }) : null,
+          skipped: true,
+          bioMetrics: this.bioEngine?.getMetrics()
+        });
+      }
     }
-    const worldMatrix = trackingState.currentModelViewTransform ? this._glModelViewMatrix(trackingState.currentModelViewTransform, 0) : null;
-    this.onUpdate?.({
-      type: "updateMatrix",
-      targetIndex: 0,
-      worldMatrix: worldMatrix ? this.featureManager.applyWorldMatrixFilters(0, worldMatrix, { stability: 0.9 }) : null,
-      skipped: true,
-      bioMetrics: this.bioEngine?.getMetrics()
-    });
     this.onUpdate?.({ type: "processDone" });
   }
   /**
@@ -12871,6 +12880,22 @@ var overlayImg = document.getElementById("overlay-img");
 var capturePreview = document.getElementById("capture-preview");
 var arContainer = document.getElementById("ar-container");
 var ttsInput = document.getElementById("tts-input");
+var overlayInput = document.getElementById("overlay-input");
+if (overlayInput) {
+  overlayInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          overlayImg.src = evt.target.result;
+          log("Imagen de overlay actualizada");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
 var lastSpokenText = "";
 var lastSpeakTime = 0;
 var lastDetectedTime = null;

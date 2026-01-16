@@ -19,6 +19,24 @@ const overlayImg = document.getElementById('overlay-img') as HTMLImageElement;
 const capturePreview = document.getElementById('capture-preview') as HTMLImageElement;
 const arContainer = document.getElementById('ar-container')!;
 const ttsInput = document.getElementById('tts-input') as HTMLInputElement;
+const overlayInput = document.getElementById('overlay-input') as HTMLInputElement;
+
+// Handle Overlay Image Selection
+if (overlayInput) {
+    overlayInput.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                if (evt.target?.result) {
+                    overlayImg.src = evt.target.result as string;
+                    log('Imagen de overlay actualizada');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
 
 let lastSpokenText = '';
 let lastSpeakTime = 0;
